@@ -1,0 +1,48 @@
+{
+  "project_info": {
+    "project_number": "475796723119",
+    "firebase_url": "https://pressure2location.firebaseio.com",
+    "project_id": "pressure2location",
+    "storage_bucket": "pressure2location.appspot.com"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:475796723119:android:371757cd85a81581",
+        "android_client_info": {
+          "package_name": "com.example.anirudh.locationman"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "475796723119-s4h3g83n8jsjnbfrl1uvubtcm2ff2bkl.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.example.anirudh.locationman",
+            "certificate_hash": "f39fc89e333489fc549063230ab05b7d3a870295"
+          }
+        },
+        {
+          "client_id": "475796723119-20ormrp1gfi67hbem4svp1c19m7immhq.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDA3qS12cVN7hh-uATHsY5_cblnF4C9tik"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "475796723119-20ormrp1gfi67hbem4svp1c19m7immhq.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
