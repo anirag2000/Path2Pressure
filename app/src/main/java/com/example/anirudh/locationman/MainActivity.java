@@ -3,6 +3,7 @@ package com.example.anirudh.locationman;
 import android.Manifest;
 import android.content.Context;
 import android.content.DialogInterface;
+import android.content.Intent;
 import android.content.pm.PackageManager;
 import android.database.Cursor;
 import android.database.sqlite.SQLiteDatabase;
@@ -69,6 +70,7 @@ String  m_Text;
     Calendar calendar;
     Instant start;
     Instant end;
+    int poll;
 
 
     @Override
@@ -76,6 +78,9 @@ String  m_Text;
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
         //db=FirebaseFirestore.getInstance();
+       Intent intent=getIntent();
+        poll =Integer.parseInt(intent.getStringExtra("poll"));
+
         if (checkSelfPermission(Manifest.permission.ACCESS_COARSE_LOCATION)
                 == PackageManager.PERMISSION_GRANTED && checkSelfPermission(Manifest.permission.WRITE_EXTERNAL_STORAGE)
                 == PackageManager.PERMISSION_GRANTED) {
@@ -224,6 +229,8 @@ String  m_Text;
                 }
             }
         });
+        final int k=poll;
+
         handler = new Handler();
 
         final Runnable r = new Runnable() {
@@ -231,10 +238,10 @@ String  m_Text;
                 getLocation();
                 exportTheDB();
 
-                handler.postDelayed(this, 100);
+                handler.postDelayed(this, k);
             }
         };
-        handler.postDelayed(r, 100);
+        handler.postDelayed(r, k);
 
 
 
