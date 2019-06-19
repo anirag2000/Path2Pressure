@@ -72,7 +72,7 @@ String m_Text;
 
     void dtw()
     {
-        Intent intent=new Intent(Home.this,DTW.class);
+        Intent intent=new Intent(Home.this,DTWjava.class);
         startActivity(intent);
     }
 

@@ -59,6 +59,7 @@ String  m_Text;
     Handler handler;
     double ax, ay, az;
     double mx, my, mz;
+    double gx, gy, gz;
     double pressure;
     File myFile;
     FileWriter fw;
@@ -137,7 +138,7 @@ String  m_Text;
 
                 Toast.makeText(MainActivity.this,m_Text,Toast.LENGTH_LONG).show();
 
-                String filePath = "/storage/emulated/0/Download/"+m_Text+".csv";
+                String filePath = "/storage/emulated/0/qpython/"+m_Text+".csv";
                 try {
                     myFile = new File(filePath);
                     fw = new FileWriter(filePath);
@@ -152,6 +153,14 @@ String  m_Text;
                     fw.append(',');
 
                     fw.append("Az");
+                    fw.append(',');
+                    fw.append("Gx");
+                    fw.append(',');
+
+                    fw.append("Gy");
+                    fw.append(',');
+
+                    fw.append("Gz");
                     fw.append(',');
 
                     fw.append("lat");
@@ -196,7 +205,7 @@ String  m_Text;
         SensorManager sensorManager;
         sensorManager = (SensorManager) getSystemService(SENSOR_SERVICE);
         if (sensorManager.getDefaultSensor(Sensor.TYPE_ACCELEROMETER) != null) {
-            Sensor accelerometer = sensorManager.getDefaultSensor(Sensor.TYPE_LINEAR_ACCELERATION);
+            Sensor accelerometer = sensorManager.getDefaultSensor(Sensor.TYPE_ACCELEROMETER);
             sensorManager.registerListener(this, accelerometer, SensorManager.SENSOR_DELAY_NORMAL);
         }
 
@@ -209,8 +218,8 @@ String  m_Text;
             Sensor magnetometer = sensorManager.getDefaultSensor(Sensor.TYPE_MAGNETIC_FIELD);
             sensorManager.registerListener(this, magnetometer, SensorManager.SENSOR_DELAY_NORMAL);
         }
-        if (sensorManager.getDefaultSensor(Sensor.TYPE_GYROSCOPE) != null) {
-            Sensor magnetometer = sensorManager.getDefaultSensor(Sensor.TYPE_GYROSCOPE);
+        if (sensorManager.getDefaultSensor(Sensor.TYPE_GRAVITY) != null) {
+            Sensor magnetometer = sensorManager.getDefaultSensor(Sensor.TYPE_GRAVITY);
             sensorManager.registerListener(this, magnetometer, SensorManager.SENSOR_DELAY_NORMAL);
         }
 
@@ -263,7 +272,7 @@ String  m_Text;
 
     @Override
     public void onSensorChanged(SensorEvent event) {
-        if (event.sensor.getType() == Sensor.TYPE_LINEAR_ACCELERATION) {
+        if (event.sensor.getType() == Sensor.TYPE_ACCELEROMETER) {
             ax = event.values[0];
             ay = event.values[1];
             az = event.values[2];
@@ -277,6 +286,13 @@ String  m_Text;
 
 
         }
+        if (event.sensor.getType() == Sensor.TYPE_GRAVITY) {
+            gx = event.values[0];
+            gy = event.values[1];
+            gz = event.values[2];
+
+
+        }
 
         if (event.sensor.getType() == Sensor.TYPE_PRESSURE) {
             pressure = event.values[0];
@@ -285,8 +301,11 @@ String  m_Text;
         }
         DecimalFormat formatter = new DecimalFormat("#0.00000");
         TextView textView = findViewById(R.id.textView2);
-        textView.setText("Ax:" + formatter.format(ax) + "Ay:" + formatter.format(ay) + "Az:" + formatter.format(az) + "\n\n" + "Mx"
-                + formatter.format(mx) + "My:" + formatter.format(my) + "Mz" + formatter.format(mz) + "\n\n" +
+        textView.setText("Ax:" + formatter.format(ax) + "Ay:" + formatter.format(ay) + "Az:" + formatter.format(az) + "\n\n" +"Gx:" +
+                         formatter.format(gx) + "Gy:" + formatter.format(gy) + "Gz" + formatter.format(gz) + "\n\n"+
+
+
+
                 "P" + Double.toString(pressure));
 
     }
@@ -375,6 +394,14 @@ String  m_Text;
             fw.append(',');
 
             fw.append(Double.toString(az));
+            fw.append(',');
+            fw.append(Double.toString(gx));
+            fw.append(',');
+
+            fw.append(Double.toString(gy));
+            fw.append(',');
+
+            fw.append(Double.toString(gz));
             fw.append(',');
 
             fw.append(Double.toString(latitude));
