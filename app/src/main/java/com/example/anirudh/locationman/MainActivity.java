@@ -31,6 +31,14 @@ import android.widget.TextView;
 import android.widget.Toast;
 
 
+import com.kircherelectronics.fsensor.filter.averaging.LowPassFilter;
+import com.kircherelectronics.fsensor.filter.gyroscope.fusion.kalman.OrientationFusedKalman;
+import com.kircherelectronics.fsensor.linearacceleration.LinearAcceleration;
+import com.kircherelectronics.fsensor.linearacceleration.LinearAccelerationFusion;
+import com.kircherelectronics.fsensor.sensor.FSensor;
+import com.kircherelectronics.fsensor.sensor.acceleration.KalmanLinearAccelerationSensor;
+import com.kircherelectronics.fsensor.util.rotation.RotationUtil;
+
 import java.io.File;
 import java.io.FileOutputStream;
 import java.io.FileWriter;
@@ -47,24 +55,47 @@ import java.util.Date;
 
 import io.nlopez.smartlocation.OnLocationUpdatedListener;
 import io.nlopez.smartlocation.SmartLocation;
+import io.reactivex.subjects.PublishSubject;
 
-public class MainActivity extends AppCompatActivity implements SensorEventListener {
+public class MainActivity extends AppCompatActivity implements FSensor,SensorEventListener {
+
+    private static final String TAG = KalmanLinearAccelerationSensor.class.getSimpleName();
+
+    private SensorManager sensorManager;
+    private SimpleSensorListener listener;
+    private float startTime = 0;
+    private int count = 0;
+
+    private boolean hasRotation = false;
+    private boolean hasMagnetic = false;
+
+    private float[] magnetic = new float[3];
+    private float[] rawAcceleration = new float[3];
+    private float[] rotation = new float[3];
+    private float[] acceleration = new float[3];
+    private float[] output = new float[4];
+
+    private LinearAcceleration linearAccelerationFilterKalman;
+    private OrientationFusedKalman orientationFusionKalman;
+
+    private int sensorFrequency = SensorManager.SENSOR_DELAY_FASTEST;
+
+    private PublishSubject<float[]> publishSubject;
 
 
-//private FirebaseFirestore db;
-String  m_Text;
+    String m_Text;
     double velocity;
-    double latitude=0.0;
-    double longitude=0.0;
+    double latitude = 0.0;
+    double longitude = 0.0;
     Handler handler;
     double ax, ay, az;
-    double mx, my, mz;
-    double gx, gy, gz;
+    double mx = 0.0, my = 0.0, mz = 0.0;
+    double gx = 0.0, gy = 0.0, gz = 0.0;
     double pressure;
     File myFile;
     FileWriter fw;
-    double lat1,lat2,long1,long2;
-    int count=0;
+    double lat1, lat2, long1, long2;
+    int countloc = 0;
     double distance1;
 
     SimpleDateFormat mdformat;
@@ -78,17 +109,19 @@ String  m_Text;
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
-        //db=FirebaseFirestore.getInstance();
-       Intent intent=getIntent();
-        poll =Integer.parseInt(intent.getStringExtra("poll"));
+
+        Intent intent = getIntent();
+        this.sensorManager = (SensorManager) getApplicationContext().getSystemService(Context.SENSOR_SERVICE);
+        this.listener = new SimpleSensorListener();
+        this.publishSubject = PublishSubject.create();
+        initializeFSensorFusions();
+
+
+        poll = Integer.parseInt(intent.getStringExtra("poll"));
 
         if (checkSelfPermission(Manifest.permission.ACCESS_COARSE_LOCATION)
                 == PackageManager.PERMISSION_GRANTED && checkSelfPermission(Manifest.permission.WRITE_EXTERNAL_STORAGE)
                 == PackageManager.PERMISSION_GRANTED) {
-
-
-            // MY_PERMISSIONS_REQUEST_READ_CONTACTS is an
-            // app-defined int constant
 
 
             Button start = findViewById(R.id.button3);
@@ -97,6 +130,9 @@ String  m_Text;
                 public void onClick(View v) {
 
                     onstartclick();
+                    startTime = 0;
+                    count = 0;
+
                 }
             });
             Button stop = findViewById(R.id.button2);
@@ -108,16 +144,14 @@ String  m_Text;
             });
 
 
-        }
-        else {
-        Toast.makeText(MainActivity.this,"PLEASE GRANT PERMISSSION",Toast.LENGTH_LONG).show();
+        } else {
+            Toast.makeText(MainActivity.this, "PLEASE GRANT PERMISSSION", Toast.LENGTH_LONG).show();
         }
         return;
     }
 
 
-    void onstartclick()
-    {
+    void onstartclick() {
 
         AlertDialog.Builder builder = new AlertDialog.Builder(this);
         builder.setTitle("Enter the name of the file");
@@ -125,9 +159,8 @@ String  m_Text;
 // Set up the input
         final EditText input = new EditText(this);
 // Specify the type of input expected; this, for example, sets the input as a password, and will mask the text
-        input.setInputType(InputType.TYPE_CLASS_TEXT );
+        input.setInputType(InputType.TYPE_CLASS_TEXT);
         builder.setView(input);
-
 
 
 // Set up the buttons
@@ -136,9 +169,9 @@ String  m_Text;
             public void onClick(DialogInterface dialog, int which) {
                 m_Text = input.getText().toString();
 
-                Toast.makeText(MainActivity.this,m_Text,Toast.LENGTH_LONG).show();
+                Toast.makeText(MainActivity.this, m_Text, Toast.LENGTH_LONG).show();
 
-                String filePath = "/storage/emulated/0/qpython/"+m_Text+".csv";
+                String filePath = "/storage/emulated/0/qpython/" + m_Text + ".csv";
                 try {
                     myFile = new File(filePath);
                     fw = new FileWriter(filePath);
@@ -154,14 +187,7 @@ String  m_Text;
 
                     fw.append("Az");
                     fw.append(',');
-                    fw.append("Gx");
-                    fw.append(',');
 
-                    fw.append("Gy");
-                    fw.append(',');
-
-                    fw.append("Gz");
-                    fw.append(',');
 
                     fw.append("lat");
                     fw.append(',');
@@ -169,24 +195,19 @@ String  m_Text;
                     fw.append("long");
                     fw.append(',');
 
-                    fw.append("mx");
-                    fw.append(',');
 
-                    fw.append("my");
-                    fw.append(',');
-
-                    fw.append("mz");
-                    fw.append(',');
                     fw.append("Pressure");
                     fw.append(',');
                     fw.append('\n');
-                    Toast.makeText(MainActivity.this,"STARTED RECORDING DATA",Toast.LENGTH_LONG).show();
+                    startTime = 0;
+                    count = 0;
+                    registerSensors(sensorFrequency);
+                    orientationFusionKalman.startFusion();
+                    Toast.makeText(MainActivity.this, "STARTED RECORDING DATA", Toast.LENGTH_LONG).show();
 
 
-
-                }
-                catch (IOException e)
-                {
+                } catch (IOException e) {
+                    Log.w("ERROR", e.toString());
 
                 }
 
@@ -204,24 +225,18 @@ String  m_Text;
 
         SensorManager sensorManager;
         sensorManager = (SensorManager) getSystemService(SENSOR_SERVICE);
+
         if (sensorManager.getDefaultSensor(Sensor.TYPE_ACCELEROMETER) != null) {
             Sensor accelerometer = sensorManager.getDefaultSensor(Sensor.TYPE_ACCELEROMETER);
             sensorManager.registerListener(this, accelerometer, SensorManager.SENSOR_DELAY_NORMAL);
         }
+
 
         if (sensorManager.getDefaultSensor(Sensor.TYPE_PRESSURE) != null) {
             Sensor gyroscope = sensorManager.getDefaultSensor(Sensor.TYPE_PRESSURE);
             sensorManager.registerListener(this, gyroscope, SensorManager.SENSOR_DELAY_NORMAL);
         }
 
-        if (sensorManager.getDefaultSensor(Sensor.TYPE_MAGNETIC_FIELD) != null) {
-            Sensor magnetometer = sensorManager.getDefaultSensor(Sensor.TYPE_MAGNETIC_FIELD);
-            sensorManager.registerListener(this, magnetometer, SensorManager.SENSOR_DELAY_NORMAL);
-        }
-        if (sensorManager.getDefaultSensor(Sensor.TYPE_GRAVITY) != null) {
-            Sensor magnetometer = sensorManager.getDefaultSensor(Sensor.TYPE_GRAVITY);
-            sensorManager.registerListener(this, magnetometer, SensorManager.SENSOR_DELAY_NORMAL);
-        }
 
         Button button = findViewById(R.id.button2);
 
@@ -230,21 +245,24 @@ String  m_Text;
             public void onClick(View v) {
                 try {
                     fw.close();
-                    Toast.makeText(MainActivity.this,"STOPPED,check download folder for csv file",Toast.LENGTH_LONG).show();
-                }
-                catch (IOException e)
-                {
+                    orientationFusionKalman.stopFusion();
+                    unregisterSensors();
+
+                    Toast.makeText(MainActivity.this, "STOPPED,check download folder for csv file", Toast.LENGTH_LONG).show();
+
+                } catch (IOException e) {
+                    Log.w("ERROR", e.toString());
 
                 }
             }
         });
-        final int k=poll;
+        final int k = poll;
 
         handler = new Handler();
 
         final Runnable r = new Runnable() {
             public void run() {
-                getLocation();
+                // getLocation();
                 exportTheDB();
 
                 handler.postDelayed(this, k);
@@ -253,16 +271,13 @@ String  m_Text;
         handler.postDelayed(r, k);
 
 
-
-
-        Button start=findViewById(R.id.button3);
+        Button start = findViewById(R.id.button3);
         start.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
-                Toast.makeText(MainActivity.this,"PRESS STOP",Toast.LENGTH_LONG).show();
+                Toast.makeText(MainActivity.this, "PRESS STOP", Toast.LENGTH_LONG).show();
             }
         });
-
     }
 
 
@@ -272,49 +287,31 @@ String  m_Text;
 
     @Override
     public void onSensorChanged(SensorEvent event) {
-        if (event.sensor.getType() == Sensor.TYPE_ACCELEROMETER) {
-            ax = event.values[0];
-            ay = event.values[1];
-            az = event.values[2];
 
-
-        }
-        if (event.sensor.getType() == Sensor.TYPE_MAGNETIC_FIELD) {
-            mx = event.values[0];
-            my = event.values[1];
-            mz = event.values[2];
-
-
-        }
-        if (event.sensor.getType() == Sensor.TYPE_GRAVITY) {
-            gx = event.values[0];
-            gy = event.values[1];
-            gz = event.values[2];
-
-
-        }
 
         if (event.sensor.getType() == Sensor.TYPE_PRESSURE) {
             pressure = event.values[0];
 
 
         }
+
+
         DecimalFormat formatter = new DecimalFormat("#0.00000");
         TextView textView = findViewById(R.id.textView2);
-        textView.setText("Ax:" + formatter.format(ax) + "Ay:" + formatter.format(ay) + "Az:" + formatter.format(az) + "\n\n" +"Gx:" +
-                         formatter.format(gx) + "Gy:" + formatter.format(gy) + "Gz" + formatter.format(gz) + "\n\n"+
-
+        textView.setText("Ax:" + formatter.format(ax) + "Ay:" + formatter.format(ay) + "Az:" + formatter.format(az) + "\n\n" + "Gx:" +
+                formatter.format(gx) + "Gy:" + formatter.format(gy) + "Gz" + formatter.format(gz) + "\n\n" +
 
 
                 "P" + Double.toString(pressure));
 
     }
 
+
     void getLocation() {
 
 
         calendar = Calendar.getInstance();
-         mdformat = new SimpleDateFormat("HH:mm:ss");
+        mdformat = new SimpleDateFormat("HH:mm:ss");
 
         SmartLocation.with(getApplicationContext()).location().continuous()
                 .start(new OnLocationUpdatedListener() {
@@ -322,40 +319,39 @@ String  m_Text;
                     public void onLocationUpdated(Location location) {
 
 
-                        if(location.getLatitude()!=0.0) {
-                            if(count==0) {
+                        if (location.getLatitude() != 0.0) {
+                            if (countloc == 0) {
                                 lat1 = location.getLatitude();
                                 long1 = location.getLongitude();
                                 start = Instant.now();
 
 
                             }
-                            count=count+1;
-                            long2=location.getLongitude();
-                            lat2=location.getLatitude();
-                           end = Instant.now();
+                            countloc = countloc + 1;
+                            long2 = location.getLongitude();
+                            lat2 = location.getLatitude();
+                            end = Instant.now();
 
 
-                            if(lat1!=long1|| lat2!=long2)
-                            {
-                                double dist =distance(lat1,long1,lat2,long2);
-                                distance1=distance1+dist;
+                            if (lat1 != long1 || lat2 != long2) {
+                                double dist = distance(lat1, long1, lat2, long2);
+                                distance1 = distance1 + dist;
                                 Duration timeElapsed = Duration.between(start, end);
 
-                               double time =((timeElapsed.toMillis())/1000);
+                                double time = ((timeElapsed.toMillis()) / 1000);
 
-                               if(dist!=0.0) {
-                                   velocity = dist / time;
-                               }
-                                start=end;
-                                TextView tv=findViewById(R.id.textView3);
-                                if(time!=0.0) {
+                                if (dist != 0.0) {
+                                    velocity = dist / time;
+                                }
+                                start = end;
+                                TextView tv = findViewById(R.id.textView3);
+                                if (time != 0.0) {
                                     tv.setText("Distance:" + distance1 + "\n" + "Time:" + time + "\n" + "vel" + velocity);
 
 
                                 }
-                                lat1=lat2;
-                                long1=long2;
+                                lat1 = lat2;
+                                long1 = long2;
 
 
                             }
@@ -374,6 +370,7 @@ String  m_Text;
                 });
     }
 
+
     private void exportTheDB() {
 
 
@@ -381,7 +378,6 @@ String  m_Text;
             Calendar calendar = Calendar.getInstance();
             SimpleDateFormat mdformat = new SimpleDateFormat("HH:mm:ss:SSS");
             String strDate = mdformat.format(calendar.getTime());
-
 
 
             fw.append(strDate);
@@ -395,14 +391,6 @@ String  m_Text;
 
             fw.append(Double.toString(az));
             fw.append(',');
-            fw.append(Double.toString(gx));
-            fw.append(',');
-
-            fw.append(Double.toString(gy));
-            fw.append(',');
-
-            fw.append(Double.toString(gz));
-            fw.append(',');
 
             fw.append(Double.toString(latitude));
             fw.append(',');
@@ -410,33 +398,162 @@ String  m_Text;
             fw.append(Double.toString(longitude));
             fw.append(',');
 
-            fw.append(Double.toString(mx));
-            fw.append(',');
 
-            fw.append(Double.toString(my));
-            fw.append(',');
-
-            fw.append(Double.toString(mz));
-            fw.append(',');
             fw.append(Double.toString(pressure));
             fw.append(',');
 
-           // Toast.makeText(MainActivity.this,"ERITITNT", Toast.LENGTH_LONG).show();
+            //Toast.makeText(MainActivity.this,"ERITITNT", Toast.LENGTH_LONG).show();
 
             fw.append('\n');
         } catch (Exception e) {
             //Toast.makeText(MainActivity.this, e.toString(), Toast.LENGTH_LONG).show();
+            Log.w("ERROR", e.toString());
         }
 
 
     }
+
     double distance(double lat1, double lon1, double lat2, double lon2) {
         double p = 0.017453292519943295;    // Math.PI / 180
 
-        double a = 0.5 - Math.cos((lat2 - lat1) * p)/2 +
+        double a = 0.5 - Math.cos((lat2 - lat1) * p) / 2 +
                 Math.cos(lat1 * p) * Math.cos(lat2 * p) *
-                        (1 - Math.cos((lon2 - lon1) * p))/2;
+                        (1 - Math.cos((lon2 - lon1) * p)) / 2;
 
         return 12742000 * Math.asin(Math.sqrt(a)); // 2 * R; R = 6371 km
     }
+
+
+    @Override
+    public PublishSubject<float[]> getPublishSubject() {
+        return publishSubject;
+    }
+
+
+    public void setSensorFrequency(int sensorFrequency) {
+        this.sensorFrequency = sensorFrequency;
+    }
+
+    public void reset() {
+        onStop();
+        magnetic = new float[3];
+        acceleration = new float[3];
+        rotation = new float[3];
+        output = new float[4];
+        hasRotation = false;
+        hasMagnetic = false;
+        onStart();
+    }
+
+    private float calculateSensorFrequency() {
+        // Initialize the start time.
+        if (startTime == 0) {
+            startTime = System.nanoTime();
+        }
+
+        long timestamp = System.nanoTime();
+
+        // Find the sample period (between updates) and convert from
+        // nanoseconds to seconds. Note that the sensor delivery rates can
+        // individually vary by a relatively large time frame, so we use an
+        // averaging technique with the number of sensor updates to
+        // determine the delivery rate.
+
+        return (count++ / ((timestamp - startTime) / 1000000000.0f));
+    }
+
+    private void initializeFSensorFusions() {
+        orientationFusionKalman = new OrientationFusedKalman();
+        linearAccelerationFilterKalman = new LinearAccelerationFusion(orientationFusionKalman);
+    }
+
+    private void processRawAcceleration(float[] rawAcceleration) {
+        System.arraycopy(rawAcceleration, 0, this.rawAcceleration, 0, this.rawAcceleration.length);
+    }
+
+    private void processAcceleration(float[] acceleration) {
+        System.arraycopy(acceleration, 0, this.acceleration, 0, this.acceleration.length);
+    }
+
+    private void processMagnetic(float[] magnetic) {
+        System.arraycopy(magnetic, 0, this.magnetic, 0, this.magnetic.length);
+    }
+
+    private void processRotation(float[] rotation) {
+        System.arraycopy(rotation, 0, this.rotation, 0, this.rotation.length);
+    }
+
+    private void registerSensors(int sensorDelay) {
+
+        orientationFusionKalman.reset();
+
+        // Register for sensor updates.
+        sensorManager.registerListener(listener, sensorManager
+                        .getDefaultSensor(Sensor.TYPE_LINEAR_ACCELERATION),
+                sensorDelay);
+
+        // Register for sensor updates.
+        sensorManager.registerListener(listener, sensorManager
+                        .getDefaultSensor(Sensor.TYPE_MAGNETIC_FIELD),
+                sensorDelay);
+
+        // Register for sensor updates.
+        sensorManager.registerListener(listener,
+                sensorManager.getDefaultSensor(Sensor.TYPE_GYROSCOPE_UNCALIBRATED),
+                sensorDelay);
+
+    }
+
+    private void unregisterSensors() {
+        sensorManager.unregisterListener(listener);
+    }
+
+    private void setOutput(float[] value) {
+        System.arraycopy(value, 0, output, 0, value.length);
+        output[3] = calculateSensorFrequency();
+        publishSubject.onNext(output);
+        ax = output[0];
+        ay = output[1];
+        az = output[2];
+
+    }
+
+    private class SimpleSensorListener implements SensorEventListener {
+
+        @Override
+        public void onSensorChanged(SensorEvent event) {
+            if (event.sensor.getType() == Sensor.TYPE_LINEAR_ACCELERATION) {
+                // processRawAcceleration(event.values);
+                //if (!orientationFusionKalman.isBaseOrientationSet()) {
+                //  if (hasRotation && hasMagnetic) {
+                //    orientationFusionKalman.setBaseOrientation(RotationUtil.getOrientationVectorFromAccelerationMagnetic(rawAcceleration, magnetic));
+                //}
+                //} else {
+                //  orientationFusionKalman.calculateFusedOrientation(rotation, event.timestamp, rawAcceleration, magnetic);
+                //processAcceleration(linearAccelerationFilterKalman.filter(rawAcceleration));
+//Toast.makeText(MainActivity.this,"workimg", (Toast.LENGTH_LONG)).show();
+                acceleration = event.values;
+                ax = acceleration[0];
+                ay = acceleration[1];
+                az = acceleration[2];
+                //   }
+                //} else if (event.sensor.getType() == Sensor.TYPE_MAGNETIC_FIELD) {
+                //    processMagnetic(event.values);
+                //  hasMagnetic = true;
+                //} else if (event.sensor.getType() == Sensor.TYPE_GYROSCOPE_UNCALIBRATED) {
+                //   processRotation(event.values);
+                hasRotation = true;
+            }
+        }
+
+        @Override
+        public void onAccuracyChanged(Sensor sensor, int accuracy) {
+        }
+    }
 }
+
+
+
+
+
+

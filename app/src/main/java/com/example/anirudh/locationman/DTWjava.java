@@ -1,27 +1,18 @@
 package com.example.anirudh.locationman;
-import com.example.anirudh.locationman.RealPathUtils;
-import android.annotation.SuppressLint;
-import android.app.ProgressDialog;
-import android.content.Context;
+import android.app.Dialog;
 import android.content.Intent;
-import android.content.pm.ApplicationInfo;
-import android.content.pm.PackageManager;
-import android.database.Cursor;
 import android.hardware.Sensor;
 import android.hardware.SensorEvent;
 import android.hardware.SensorEventListener;
 import android.hardware.SensorManager;
 import android.net.Uri;
-import android.provider.DocumentsContract;
-import android.provider.MediaStore;
-import android.support.v4.content.CursorLoader;
+import android.support.v7.app.AlertDialog;
 import android.support.v7.app.AppCompatActivity;
 import android.os.Bundle;
 import android.util.Log;
-import android.view.Menu;
 import android.view.View;
 import android.widget.Button;
-import android.widget.EditText;
+import android.widget.ProgressBar;
 import android.widget.TextView;
 import android.widget.Toast;
 
@@ -38,7 +29,6 @@ import java.io.InputStream;
 import java.io.OutputStream;
 import java.net.HttpURLConnection;
 import java.net.URL;
-import java.util.List;
 import java.util.Timer;
 import java.util.TimerTask;
 
@@ -51,11 +41,16 @@ public class DTWjava extends AppCompatActivity  implements SensorEventListener {
     int status=0;
 double pressure;
 String serverurl="http://192.168.43.87:5000";
+int postcount=1;
+
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
+
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_dtw);
+        ProgressBar  progressBar=findViewById(R.id.progressBar);
+        progressBar.setVisibility(View.INVISIBLE);
         Button select=findViewById(R.id.selectfile);
         sensorManager=(SensorManager) getSystemService(SENSOR_SERVICE);
         sensorManager.registerListener(this, sensorManager.getDefaultSensor(Sensor.TYPE_PRESSURE), SensorManager.SENSOR_DELAY_NORMAL);
@@ -100,14 +95,16 @@ addreference();
     {
 
 
-        new Thread(new Runnable() {
+        Timer timer = new Timer();
+        timer.scheduleAtFixedRate(new TimerTask() {
+
             @Override
             public void run() {
 
                     OutputStream os = null;
                     InputStream is = null;
                     HttpURLConnection conn = null;
-                    while(true) {
+                    while(status==0) {
                         try {
                             if (status == 0) {
 
@@ -119,8 +116,9 @@ addreference();
                                         status = 1;
                                     }
                                 });
+
                                 //constants
-                                URL url = new URL(serverurl+"/postjson");
+                                URL url = new URL(serverurl+"/postrealtime");
                                 JSONObject jsonObject = new JSONObject();
 
 
@@ -159,8 +157,9 @@ addreference();
                                         sb.append((char) chr);
                                     }
                                     String reply = sb.toString();
-                                    TextView dtw=findViewById(R.id.dtwresult);
-                                    dtw.setText(reply);
+                                    TextView textView=findViewById(R.id.dtwresult);
+                                    textView.setText(reply);
+
                                 } finally {
                                     is.close();
                                 }
@@ -177,16 +176,23 @@ addreference();
                             e.printStackTrace();
                             Log.w("warning", e.toString());
                         }
+                        postcount=postcount+1;
                     }
 
+
                     }
 
 
-        }).start();
+        }, 100, 100);
+
     }
 
     void addreference()
     {
+        ProgressBar progressBar=findViewById(R.id.progressBar);
+
+        progressBar.setVisibility(View.VISIBLE);
+
 
         Toast.makeText(DTWjava.this,"STARTED",Toast.LENGTH_LONG).show();
         count=0;
@@ -221,7 +227,7 @@ addreference();
                 HttpURLConnection conn = null;
                 try {
                     //constants
-                    URL url = new URL(serverurl+"/postreference");
+                    URL url = new URL("http://192.168.43.87:5000/postreference");
                     JSONObject jsonObject = new JSONObject();
                     jsonObject.put("reference", reference);
                     Log.w("lol", reference  );
@@ -238,7 +244,9 @@ addreference();
 
                     //make some HTTP header nicety
                     conn.setRequestProperty("Content-Type", "application/json;charset=utf-8");
-                    conn.setRequestProperty("X-Requested-With", "XMLHttpRequest");
+                    //conn.setRequestProperty("X-Requested-With", "XMLHttpRequest");
+
+                      //  is.close();
 
                     //open
                     conn.connect();
@@ -272,8 +280,9 @@ addreference();
                     e.printStackTrace();
                     Log.w("warning", e.toString() );
                 } finally {
-
-                    conn.disconnect();
+                    if(conn!=null) {
+                        conn.disconnect();
+                    }
                 }
 
 
@@ -287,6 +296,7 @@ addreference();
             }
 
         }, 0, 10);
+        progressBar.setVisibility(View.INVISIBLE);
     }
 
 
@@ -342,7 +352,7 @@ addreference();
                     HttpURLConnection conn = null;
                     try {
                         //constants
-                        URL url = new URL(serverurl+"/dtw");
+                        URL url = new URL(serverurl+"/checkfile");
                         JSONObject jsonObject = new JSONObject();
                         jsonObject.put("reference", "lol");
                         Log.w("lol", " " + "lol");
@@ -409,5 +419,14 @@ addreference();
 
 
 
+    }
 
-}
+
+
+
+
+
+
+
+
+
