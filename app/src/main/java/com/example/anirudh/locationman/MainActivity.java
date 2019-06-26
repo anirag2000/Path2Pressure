@@ -5,20 +5,18 @@ import android.content.Context;
 import android.content.DialogInterface;
 import android.content.Intent;
 import android.content.pm.PackageManager;
-import android.database.Cursor;
-import android.database.sqlite.SQLiteDatabase;
-import android.database.sqlite.SQLiteException;
+
 import android.hardware.Sensor;
 import android.hardware.SensorEvent;
 import android.hardware.SensorEventListener;
 import android.hardware.SensorManager;
 import android.location.Location;
-import android.location.LocationListener;
-import android.location.LocationManager;
-import android.os.AsyncTask;
-import android.os.Build;
+
 import android.os.Handler;
-import android.support.v4.util.LogWriter;
+import android.graphics.Bitmap;
+import android.graphics.Color;
+import android.graphics.Paint;
+import android.graphics.RectF;
 import android.support.v7.app.AlertDialog;
 import android.support.v7.app.AppCompatActivity;
 import android.os.Bundle;
@@ -27,11 +25,9 @@ import android.util.Log;
 import android.view.View;
 import android.widget.Button;
 import android.widget.EditText;
-import android.widget.TextView;
 import android.widget.Toast;
 
 
-import com.kircherelectronics.fsensor.filter.averaging.LowPassFilter;
 import com.kircherelectronics.fsensor.filter.gyroscope.fusion.kalman.OrientationFusedKalman;
 import com.kircherelectronics.fsensor.linearacceleration.LinearAcceleration;
 import com.kircherelectronics.fsensor.linearacceleration.LinearAccelerationFusion;
@@ -40,18 +36,13 @@ import com.kircherelectronics.fsensor.sensor.acceleration.KalmanLinearAccelerati
 import com.kircherelectronics.fsensor.util.rotation.RotationUtil;
 
 import java.io.File;
-import java.io.FileOutputStream;
 import java.io.FileWriter;
 import java.io.IOException;
-import java.io.OutputStreamWriter;
-import java.math.BigDecimal;
-import java.math.RoundingMode;
 import java.text.DecimalFormat;
 import java.text.SimpleDateFormat;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.Calendar;
-import java.util.Date;
 
 import io.nlopez.smartlocation.OnLocationUpdatedListener;
 import io.nlopez.smartlocation.SmartLocation;
@@ -59,7 +50,6 @@ import io.reactivex.subjects.PublishSubject;
 
 public class MainActivity extends AppCompatActivity implements FSensor,SensorEventListener {
 
-    private static final String TAG = KalmanLinearAccelerationSensor.class.getSimpleName();
 
     private SensorManager sensorManager;
     private SimpleSensorListener listener;
@@ -82,12 +72,36 @@ public class MainActivity extends AppCompatActivity implements FSensor,SensorEve
 
     private PublishSubject<float[]> publishSubject;
 
+    // private  final String tag = GaugeAcceleration.class.getSimpleName();
 
-    String m_Text;
+    // holds the cached static part
+    private Bitmap background;
+
+    private Paint backgroundPaint;
+    private Paint pointPaint;
+    private Paint rimPaint;
+    private Paint rimShadowPaint;
+
+    private RectF faceRect;
+    private RectF rimRect;
+    private RectF rimOuterRect;
+    private RectF innerRim;
+    private RectF innerFace;
+    private RectF innerMostDot;
+
+    private float x;
+    private float y;
+
+    private float scaleX;
+    private float scaleY;
+
+    private int color = Color.parseColor("#2196F3");
+    static  String m_Text;
     double velocity;
     double latitude = 0.0;
     double longitude = 0.0;
     Handler handler;
+    char path=97;
     double ax, ay, az;
     double mx = 0.0, my = 0.0, mz = 0.0;
     double gx = 0.0, gy = 0.0, gz = 0.0;
@@ -103,12 +117,60 @@ public class MainActivity extends AppCompatActivity implements FSensor,SensorEve
     Instant start;
     Instant end;
     int poll;
-
+    GaugeAcceleration gaugeAcceleration;
+    double Ax,Ay,Az;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
+         gaugeAcceleration=new GaugeAcceleration(getApplicationContext());
+        SensorManager sensorManager;
+        sensorManager = (SensorManager) getSystemService(SENSOR_SERVICE);
+        if (sensorManager.getDefaultSensor(Sensor.TYPE_GRAVITY) != null) {
+            Sensor accelerometer = sensorManager.getDefaultSensor(Sensor.TYPE_GRAVITY);
+            sensorManager.registerListener(this, accelerometer, SensorManager.SENSOR_DELAY_NORMAL);
+        }
+        if (sensorManager.getDefaultSensor(Sensor.TYPE_ACCELEROMETER) != null) {
+            Sensor accelerometer = sensorManager.getDefaultSensor(Sensor.TYPE_ACCELEROMETER);
+            sensorManager.registerListener(this, accelerometer, SensorManager.SENSOR_DELAY_NORMAL);
+        }
+
+
+        if (sensorManager.getDefaultSensor(Sensor.TYPE_GYROSCOPE) != null) {
+            Sensor accelerometer = sensorManager.getDefaultSensor(Sensor.TYPE_GYROSCOPE);
+            sensorManager.registerListener(this, accelerometer, SensorManager.SENSOR_DELAY_NORMAL);
+        }
+
+
+        if (sensorManager.getDefaultSensor(Sensor.TYPE_PRESSURE) != null) {
+            Sensor gyroscope = sensorManager.getDefaultSensor(Sensor.TYPE_PRESSURE);
+            sensorManager.registerListener(this, gyroscope, SensorManager.SENSOR_DELAY_NORMAL);
+        }
+        AlertDialog.Builder builder = new AlertDialog.Builder(this);
+        builder.setTitle("Enter the name of the file");
+
+        final EditText input = new EditText(this);
+        input.setInputType(InputType.TYPE_CLASS_TEXT);
+        builder.setView(input);
+
+        builder.setPositiveButton("OK", new DialogInterface.OnClickListener() {
+            @Override
+            public void onClick(DialogInterface dialog, int which) {
+                MainActivity.m_Text=input.getText().toString();
+            }
+
+                });
+          builder.setNegativeButton("Cancel", new DialogInterface.OnClickListener() {
+                @Override
+                public void onClick(DialogInterface dialog, int which) {
+                   Intent intent=new Intent(MainActivity.this,Home.class);
+                   startActivity(intent);
+                }
+            });
+
+        builder.show();
+
 
         Intent intent = getIntent();
         this.sensorManager = (SensorManager) getApplicationContext().getSystemService(Context.SENSOR_SERVICE);
@@ -152,26 +214,29 @@ public class MainActivity extends AppCompatActivity implements FSensor,SensorEve
 
 
     void onstartclick() {
+        Button button = findViewById(R.id.button2);
 
-        AlertDialog.Builder builder = new AlertDialog.Builder(this);
-        builder.setTitle("Enter the name of the file");
-
-// Set up the input
-        final EditText input = new EditText(this);
-// Specify the type of input expected; this, for example, sets the input as a password, and will mask the text
-        input.setInputType(InputType.TYPE_CLASS_TEXT);
-        builder.setView(input);
-
-
-// Set up the buttons
-        builder.setPositiveButton("START", new DialogInterface.OnClickListener() {
+        button.setOnClickListener(new View.OnClickListener() {
             @Override
-            public void onClick(DialogInterface dialog, int which) {
-                m_Text = input.getText().toString();
+            public void onClick(View v) {
+                try {
+                    fw.close();
+                    unregisterSensors();
+
+                    Toast.makeText(MainActivity.this, "STOPPED,check download folder for csv file", Toast.LENGTH_LONG).show();
+
+                } catch (IOException e) {
+                    Log.w("ERROR", e.toString());
+
+                }
+            }
+        });
+
+
 
                 Toast.makeText(MainActivity.this, m_Text, Toast.LENGTH_LONG).show();
 
-                String filePath = "/storage/emulated/0/qpython/" + m_Text + ".csv";
+                String filePath = "/storage/emulated/0/Download/" + m_Text + ".csv";
                 try {
                     myFile = new File(filePath);
                     fw = new FileWriter(filePath);
@@ -187,6 +252,16 @@ public class MainActivity extends AppCompatActivity implements FSensor,SensorEve
 
                     fw.append("Az");
                     fw.append(',');
+                    fw.append("Gx");
+                    fw.append(',');
+
+                    fw.append("Gy");
+                    fw.append(',');
+
+                    fw.append("Gz");
+                    fw.append(',');
+                    fw.append("Path");
+                    fw.append(',');
 
 
                     fw.append("lat");
@@ -201,8 +276,6 @@ public class MainActivity extends AppCompatActivity implements FSensor,SensorEve
                     fw.append('\n');
                     startTime = 0;
                     count = 0;
-                    registerSensors(sensorFrequency);
-                    orientationFusionKalman.startFusion();
                     Toast.makeText(MainActivity.this, "STARTED RECORDING DATA", Toast.LENGTH_LONG).show();
 
 
@@ -211,51 +284,15 @@ public class MainActivity extends AppCompatActivity implements FSensor,SensorEve
 
                 }
 
-            }
-        });
-        builder.setNegativeButton("Cancel", new DialogInterface.OnClickListener() {
-            @Override
-            public void onClick(DialogInterface dialog, int which) {
-                dialog.cancel();
-            }
-        });
-
-        builder.show();
 
 
-        SensorManager sensorManager;
-        sensorManager = (SensorManager) getSystemService(SENSOR_SERVICE);
-
-        if (sensorManager.getDefaultSensor(Sensor.TYPE_ACCELEROMETER) != null) {
-            Sensor accelerometer = sensorManager.getDefaultSensor(Sensor.TYPE_ACCELEROMETER);
-            sensorManager.registerListener(this, accelerometer, SensorManager.SENSOR_DELAY_NORMAL);
-        }
 
 
-        if (sensorManager.getDefaultSensor(Sensor.TYPE_PRESSURE) != null) {
-            Sensor gyroscope = sensorManager.getDefaultSensor(Sensor.TYPE_PRESSURE);
-            sensorManager.registerListener(this, gyroscope, SensorManager.SENSOR_DELAY_NORMAL);
-        }
 
 
-        Button button = findViewById(R.id.button2);
 
-        button.setOnClickListener(new View.OnClickListener() {
-            @Override
-            public void onClick(View v) {
-                try {
-                    fw.close();
-                    orientationFusionKalman.stopFusion();
-                    unregisterSensors();
 
-                    Toast.makeText(MainActivity.this, "STOPPED,check download folder for csv file", Toast.LENGTH_LONG).show();
 
-                } catch (IOException e) {
-                    Log.w("ERROR", e.toString());
-
-                }
-            }
-        });
         final int k = poll;
 
         handler = new Handler();
@@ -263,6 +300,16 @@ public class MainActivity extends AppCompatActivity implements FSensor,SensorEve
         final Runnable r = new Runnable() {
             public void run() {
                 // getLocation();
+                Button pathchange=findViewById(R.id.path_change);
+                pathchange.setOnClickListener(new View.OnClickListener() {
+                    @Override
+                    public void onClick(View v) {
+                        int k=(int)path;
+                       k=k+1;
+                       path=(char)k;
+
+                    }
+                });
                 exportTheDB();
 
                 handler.postDelayed(this, k);
@@ -289,20 +336,42 @@ public class MainActivity extends AppCompatActivity implements FSensor,SensorEve
     public void onSensorChanged(SensorEvent event) {
 
 
+
         if (event.sensor.getType() == Sensor.TYPE_PRESSURE) {
             pressure = event.values[0];
 
 
         }
+        if (event.sensor.getType() == Sensor.TYPE_GYROSCOPE) {
+            gx= event.values[0];
+            gy= event.values[1];
+            gz= event.values[2];
 
+
+        }
+        if (event.sensor.getType() == Sensor.TYPE_ACCELEROMETER) {
+            ax= event.values[0];
+            ay= event.values[1];
+            az= event.values[2];
+
+
+        }
+
+
+
+        if (event.sensor.getType() == Sensor.TYPE_GRAVITY) {
+
+            float gravityx= event.values[0];
+            float gravityy = event.values[1];
+            gaugeAcceleration.updatePoint(gravityx,gravityy);
+
+
+
+        }
 
         DecimalFormat formatter = new DecimalFormat("#0.00000");
-        TextView textView = findViewById(R.id.textView2);
-        textView.setText("Ax:" + formatter.format(ax) + "Ay:" + formatter.format(ay) + "Az:" + formatter.format(az) + "\n\n" + "Gx:" +
-                formatter.format(gx) + "Gy:" + formatter.format(gy) + "Gz" + formatter.format(gz) + "\n\n" +
 
-
-                "P" + Double.toString(pressure));
+        //    "P" + Double.toString(pressure));
 
     }
 
@@ -344,9 +413,9 @@ public class MainActivity extends AppCompatActivity implements FSensor,SensorEve
                                     velocity = dist / time;
                                 }
                                 start = end;
-                                TextView tv = findViewById(R.id.textView3);
+                                //TextView tv = findViewById(R.id.textView3);
                                 if (time != 0.0) {
-                                    tv.setText("Distance:" + distance1 + "\n" + "Time:" + time + "\n" + "vel" + velocity);
+                                    //  tv.setText("Distance:" + distance1 + "\n" + "Time:" + time + "\n" + "vel" + velocity);
 
 
                                 }
@@ -362,8 +431,8 @@ public class MainActivity extends AppCompatActivity implements FSensor,SensorEve
 
                         latitude = location.getLatitude();
                         longitude = location.getLongitude();
-                        TextView tv = findViewById(R.id.textView);
-                        tv.setText(Double.toString(latitude) + "," + Double.toString(longitude));
+                        // TextView tv = findViewById(R.id.textView);
+                        //tv.setText(Double.toString(latitude) + "," + Double.toString(longitude));
 
 
                     }
@@ -372,6 +441,7 @@ public class MainActivity extends AppCompatActivity implements FSensor,SensorEve
 
 
     private void exportTheDB() {
+
 
 
         try {
@@ -390,6 +460,16 @@ public class MainActivity extends AppCompatActivity implements FSensor,SensorEve
             fw.append(',');
 
             fw.append(Double.toString(az));
+            fw.append(',');
+            fw.append(Double.toString(gx));
+            fw.append(',');
+
+            fw.append(Double.toString(gy));
+            fw.append(',');
+
+            fw.append(Double.toString(gz));
+            fw.append(',');
+            fw.append(Character.toString(path));
             fw.append(',');
 
             fw.append(Double.toString(latitude));
@@ -523,25 +603,28 @@ public class MainActivity extends AppCompatActivity implements FSensor,SensorEve
         @Override
         public void onSensorChanged(SensorEvent event) {
             if (event.sensor.getType() == Sensor.TYPE_LINEAR_ACCELERATION) {
-                // processRawAcceleration(event.values);
-                //if (!orientationFusionKalman.isBaseOrientationSet()) {
-                //  if (hasRotation && hasMagnetic) {
-                //    orientationFusionKalman.setBaseOrientation(RotationUtil.getOrientationVectorFromAccelerationMagnetic(rawAcceleration, magnetic));
-                //}
-                //} else {
-                //  orientationFusionKalman.calculateFusedOrientation(rotation, event.timestamp, rawAcceleration, magnetic);
-                //processAcceleration(linearAccelerationFilterKalman.filter(rawAcceleration));
-//Toast.makeText(MainActivity.this,"workimg", (Toast.LENGTH_LONG)).show();
+                 processRawAcceleration(event.values);
+                if (!orientationFusionKalman.isBaseOrientationSet()) {
+                  if (hasRotation && hasMagnetic) {
+                   orientationFusionKalman.setBaseOrientation(RotationUtil.getOrientationVectorFromAccelerationMagnetic(rawAcceleration, magnetic));
+                }
+                } else {
+                  orientationFusionKalman.calculateFusedOrientation(rotation, event.timestamp, rawAcceleration, magnetic);
+                processAcceleration(linearAccelerationFilterKalman.filter(rawAcceleration));
+Toast.makeText(MainActivity.this,"workimg", (Toast.LENGTH_LONG)).show();
                 acceleration = event.values;
-                ax = acceleration[0];
-                ay = acceleration[1];
-                az = acceleration[2];
-                //   }
-                //} else if (event.sensor.getType() == Sensor.TYPE_MAGNETIC_FIELD) {
-                //    processMagnetic(event.values);
-                //  hasMagnetic = true;
-                //} else if (event.sensor.getType() == Sensor.TYPE_GYROSCOPE_UNCALIBRATED) {
-                //   processRotation(event.values);
+                Ax = acceleration[0];
+                Ay = acceleration[1];
+                Az = acceleration[2];
+
+
+
+                 }
+                } else if (event.sensor.getType() == Sensor.TYPE_MAGNETIC_FIELD) {
+                    processMagnetic(event.values);
+                  hasMagnetic = true;
+                } else if (event.sensor.getType() == Sensor.TYPE_GYROSCOPE_UNCALIBRATED) {
+                   processRotation(event.values);
                 hasRotation = true;
             }
         }
@@ -551,9 +634,3 @@ public class MainActivity extends AppCompatActivity implements FSensor,SensorEve
         }
     }
 }
-
-
-
-
-
-

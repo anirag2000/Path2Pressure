@@ -1,5 +1,6 @@
 package com.example.anirudh.locationman;
 import android.app.Dialog;
+import android.content.DialogInterface;
 import android.content.Intent;
 import android.hardware.Sensor;
 import android.hardware.SensorEvent;
@@ -9,9 +10,11 @@ import android.net.Uri;
 import android.support.v7.app.AlertDialog;
 import android.support.v7.app.AppCompatActivity;
 import android.os.Bundle;
+import android.text.InputType;
 import android.util.Log;
 import android.view.View;
 import android.widget.Button;
+import android.widget.EditText;
 import android.widget.ProgressBar;
 import android.widget.TextView;
 import android.widget.Toast;
@@ -40,8 +43,10 @@ public class DTWjava extends AppCompatActivity  implements SensorEventListener {
     Uri uri;
     int status=0;
 double pressure;
-String serverurl="http://192.168.43.87:5000";
+String serverurl="https://path2pressure.appspot.com";
 int postcount=1;
+String dtwmp;
+static String m_Text;
 
 
     @Override
@@ -52,6 +57,31 @@ int postcount=1;
         ProgressBar  progressBar=findViewById(R.id.progressBar);
         progressBar.setVisibility(View.INVISIBLE);
         Button select=findViewById(R.id.selectfile);
+        AlertDialog.Builder builder = new AlertDialog.Builder(this);
+        builder.setTitle("Enter the name of the file");
+
+// Set up the input
+        final EditText input = new EditText(this);
+// Specify the type of input expected; this, for example, sets the input as a password, and will mask the text
+        input.setInputType(InputType.TYPE_CLASS_TEXT);
+        builder.setView(input);
+
+        builder.setPositiveButton("OK", new DialogInterface.OnClickListener() {
+            @Override
+            public void onClick(DialogInterface dialog, int which) {
+                DTWjava.m_Text=input.getText().toString();
+            }
+
+        });
+        builder.setNegativeButton("Cancel", new DialogInterface.OnClickListener() {
+            @Override
+            public void onClick(DialogInterface dialog, int which) {
+                Intent intent=new Intent(DTWjava.this,Home.class);
+                startActivity(intent);
+            }
+        });
+
+        builder.show();
         sensorManager=(SensorManager) getSystemService(SENSOR_SERVICE);
         sensorManager.registerListener(this, sensorManager.getDefaultSensor(Sensor.TYPE_PRESSURE), SensorManager.SENSOR_DELAY_NORMAL);
 
@@ -120,6 +150,8 @@ addreference();
                                 //constants
                                 URL url = new URL(serverurl+"/postrealtime");
                                 JSONObject jsonObject = new JSONObject();
+                                jsonObject.put("filename", m_Text);
+
 
 
                                 jsonObject.put("pressure", Double.toString(pressure));
@@ -157,8 +189,16 @@ addreference();
                                         sb.append((char) chr);
                                     }
                                     String reply = sb.toString();
+                                    if(reply.equalsIgnoreCase("0"))
+                                    {
+
+                                    }
+                                    else
+                                    {
+                                        dtwmp=reply;
+                                    }
                                     TextView textView=findViewById(R.id.dtwresult);
-                                    textView.setText(reply);
+                                    textView.setText(dtwmp);
 
                                 } finally {
                                     is.close();
@@ -183,7 +223,7 @@ addreference();
                     }
 
 
-        }, 100, 100);
+        }, 0, 200);
 
     }
 
@@ -213,7 +253,7 @@ addreference();
             while ((nextLine = reader.readNext()) != null && count!=2) {
 
                 // nextLine[] is an array of values from the line
-                reference=nextLine[12];
+                reference=nextLine[9];
                 if(reference.equalsIgnoreCase("Pressure"))
                 {
                     count+=1;
@@ -227,8 +267,10 @@ addreference();
                 HttpURLConnection conn = null;
                 try {
                     //constants
-                    URL url = new URL("http://192.168.43.87:5000/postreference");
+                    URL url = new URL(serverurl+"/postreference");
                     JSONObject jsonObject = new JSONObject();
+
+                    jsonObject.put("filename", m_Text);
                     jsonObject.put("reference", reference);
                     Log.w("lol", reference  );
 
@@ -354,7 +396,8 @@ addreference();
                         //constants
                         URL url = new URL(serverurl+"/checkfile");
                         JSONObject jsonObject = new JSONObject();
-                        jsonObject.put("reference", "lol");
+                        jsonObject.put("filename", m_Text);
+                       
                         Log.w("lol", " " + "lol");
 
                         String message = jsonObject.toString();
