@@ -299,7 +299,7 @@ public class MainActivity extends AppCompatActivity implements FSensor,SensorEve
 
         final Runnable r = new Runnable() {
             public void run() {
-                // getLocation();
+                getLocation();
                 Button pathchange=findViewById(R.id.path_change);
                 pathchange.setOnClickListener(new View.OnClickListener() {
                     @Override
@@ -503,7 +503,13 @@ public class MainActivity extends AppCompatActivity implements FSensor,SensorEve
         return 12742000 * Math.asin(Math.sqrt(a)); // 2 * R; R = 6371 km
     }
 
+    double shortest(double error_range,double mlat,double mlong,double glat[],double glong[],double segments[]){
 
+
+
+        return 1;
+
+    }
     @Override
     public PublishSubject<float[]> getPublishSubject() {
         return publishSubject;

@@ -26,6 +26,7 @@ import org.json.JSONException;
 import org.json.JSONObject;
 
 import java.io.BufferedOutputStream;
+import java.io.BufferedReader;
 import java.io.FileReader;
 import java.io.IOException;
 import java.io.InputStream;
@@ -35,6 +36,8 @@ import java.net.URL;
 import java.util.Timer;
 import java.util.TimerTask;
 
+import static android.provider.Telephony.Mms.Part.FILENAME;
+
 
 public class DTWjava extends AppCompatActivity  implements SensorEventListener {
     private SensorManager sensorManager;
@@ -42,12 +45,16 @@ public class DTWjava extends AppCompatActivity  implements SensorEventListener {
     int count=0;
     Uri uri;
     int status=0;
-double pressure;
-String serverurl="https://path2pressure.appspot.com";
+static double pressure;
+String serverurl="https://path2pressure-244816.appspot.com";
 int postcount=1;
 String dtwmp;
 static String m_Text;
-
+int referencecount=0;
+String reference_multiple="";
+    String inputref;
+    int countref = 0;
+    String realtimevalue="0\n";
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -130,6 +137,7 @@ addreference();
 
             @Override
             public void run() {
+                Log.w("run", "run" );
 
                     OutputStream os = null;
                     InputStream is = null;
@@ -147,66 +155,74 @@ addreference();
                                     }
                                 });
 
-                                //constants
-                                URL url = new URL(serverurl+"/postrealtime");
-                                JSONObject jsonObject = new JSONObject();
-                                jsonObject.put("filename", m_Text);
+                                realtimevalue=realtimevalue+Double.toString(pressure)+"\n";
+                                if (postcount % 8 == 0) {
+
+                                    Log.w("run", "run: " );
+                                    //constants
+                                    URL url = new URL(serverurl + "/postrealtime");
+                                    JSONObject jsonObject = new JSONObject();
+                                    jsonObject.put("filename", m_Text);
 
 
+                                    jsonObject.put("pressure", realtimevalue);
+                                    String message = jsonObject.toString();
 
-                                jsonObject.put("pressure", Double.toString(pressure));
-                                String message = jsonObject.toString();
+                                    conn = (HttpURLConnection) url.openConnection();
+                                    conn.setReadTimeout(10000 /*milliseconds*/);
+                                    conn.setConnectTimeout(15000 /* milliseconds */);
+                                    conn.setRequestMethod("POST");
+                                    conn.setDoInput(true);
+                                    conn.setDoOutput(true);
+                                    conn.setFixedLengthStreamingMode(message.getBytes().length);
 
-                                conn = (HttpURLConnection) url.openConnection();
-                                conn.setReadTimeout(10000 /*milliseconds*/);
-                                conn.setConnectTimeout(15000 /* milliseconds */);
-                                conn.setRequestMethod("POST");
-                                conn.setDoInput(true);
-                                conn.setDoOutput(true);
-                                conn.setFixedLengthStreamingMode(message.getBytes().length);
+                                    //make some HTTP header nicety
+                                    conn.setRequestProperty("Content-Type", "application/json;charset=utf-8");
+                                    conn.setRequestProperty("X-Requested-With", "XMLHttpRequest");
 
-                                //make some HTTP header nicety
-                                conn.setRequestProperty("Content-Type", "application/json;charset=utf-8");
-                                conn.setRequestProperty("X-Requested-With", "XMLHttpRequest");
+                                    //open
+                                    conn.connect();
 
-                                //open
-                                conn.connect();
+                                    //setup send
+                                    os = new BufferedOutputStream(conn.getOutputStream());
+                                    os.write(message.getBytes());
+                                    // Toast.makeText(DTWjava.this,message,Toast.LENGTH_LONG).show();
+                                    //Log.w("MESSAGE", message);
+                                    //clean up
+                                    os.flush();
 
-                                //setup send
-                                os = new BufferedOutputStream(conn.getOutputStream());
-                                os.write(message.getBytes());
-                                // Toast.makeText(DTWjava.this,message,Toast.LENGTH_LONG).show();
-                                //Log.w("MESSAGE", message);
-                                //clean up
-                                os.flush();
 
-                                //do somehting with response
-                                is = conn.getInputStream();
-                                StringBuffer sb = new StringBuffer();
-                                try {
-                                    int chr;
-                                    while ((chr = is.read()) != -1) {
-                                        sb.append((char) chr);
+                                    //do somehting with response
+                                    is = conn.getInputStream();
+                                    try {
+
+
+                                        StringBuffer sb = new StringBuffer();
+                                        int chr;
+                                        while ((chr = is.read()) != -1) {
+                                            sb.append((char) chr);
+                                        }
+                                        String reply = sb.toString();
+                                        if (reply.equalsIgnoreCase("0")) {
+
+                                        } else {
+                                            dtwmp = reply;
+                                        }
+                                        TextView textView = findViewById(R.id.dtwresult);
+                                        textView.setText(dtwmp);
+
+                                    } finally {
+                                        is.close();
                                     }
-                                    String reply = sb.toString();
-                                    if(reply.equalsIgnoreCase("0"))
-                                    {
-
-                                    }
-                                    else
-                                    {
-                                        dtwmp=reply;
-                                    }
-                                    TextView textView=findViewById(R.id.dtwresult);
-                                    textView.setText(dtwmp);
-
-                                } finally {
-                                    is.close();
+                                    realtimevalue="0\n";
                                 }
-                            } else {
+
+                            }
+                            else {
                                 conn.disconnect();
                                 break;
                             }
+
                         } catch (IOException e) {
                             e.printStackTrace();
                             Log.w("warning", e.toString());
@@ -223,37 +239,36 @@ addreference();
                     }
 
 
-        }, 0, 200);
+        }, 0, 100);
 
     }
 
-    void addreference()
-    {
-        ProgressBar progressBar=findViewById(R.id.progressBar);
+    void addreference() {
+        ProgressBar progressBar = findViewById(R.id.progressBar);
 
         progressBar.setVisibility(View.VISIBLE);
 
 
-        Toast.makeText(DTWjava.this,"STARTED",Toast.LENGTH_LONG).show();
-        count=0;
+        Toast.makeText(DTWjava.this, "STARTED", Toast.LENGTH_LONG).show();
+        count = 0;
+
         checkfile();
 
-
-        Timer timer = new Timer();
-        timer.scheduleAtFixedRate(new TimerTask() {
-
+        Thread thread = new Thread() {
             @Override
             public void run() {
+
                 // Do your task
 
         try {
 
             CSVReader reader = new CSVReader(new FileReader(uri.getLastPathSegment().substring(5)));
             String[] nextLine;
+            referencecount=0;
             while ((nextLine = reader.readNext()) != null && count!=2) {
 
                 // nextLine[] is an array of values from the line
-                reference=nextLine[9];
+                reference=nextLine[10];
                 if(reference.equalsIgnoreCase("Pressure"))
                 {
                     count+=1;
@@ -262,72 +277,82 @@ addreference();
                         break;
                     }
                 }
-                OutputStream os = null;
-                InputStream is = null;
-                HttpURLConnection conn = null;
-                try {
-                    //constants
-                    URL url = new URL(serverurl+"/postreference");
-                    JSONObject jsonObject = new JSONObject();
+                if(referencecount%80==0 ) {
 
-                    jsonObject.put("filename", m_Text);
-                    jsonObject.put("reference", reference);
-                    Log.w("lol", reference  );
 
-                    String message = jsonObject.toString();
-
-                    conn = (HttpURLConnection) url.openConnection();
-                    conn.setReadTimeout(10000 /*milliseconds*/);
-                    conn.setConnectTimeout(15000 /* milliseconds */);
-                    conn.setRequestMethod("POST");
-                    conn.setDoInput(true);
-                    conn.setDoOutput(true);
-                    conn.setFixedLengthStreamingMode(message.getBytes().length);
-
-                    //make some HTTP header nicety
-                    conn.setRequestProperty("Content-Type", "application/json;charset=utf-8");
-                    //conn.setRequestProperty("X-Requested-With", "XMLHttpRequest");
-
-                      //  is.close();
-
-                    //open
-                    conn.connect();
-
-                    //setup send
-                    os = new BufferedOutputStream(conn.getOutputStream());
-                    os.write(message.getBytes());
-                    // Toast.makeText(DTWjava.this,message,Toast.LENGTH_LONG).show();
-                    //Log.w("MESSAGE", message);
-                    //clean up
-                    os.flush();
-
-                    //do somehting with response
-                    is = conn.getInputStream();
-                    StringBuffer sb = new StringBuffer();
+                    OutputStream os = null;
+                    InputStream is = null;
+                    HttpURLConnection conn = null;
                     try {
-                        int chr;
-                        while ((chr = is.read()) != -1) {
-                            sb.append((char) chr);
-                        }
-                        String reply = sb.toString();
-                        Log.w("RESULY", reply );
-                    } finally {
-                        is.close();
-                    }
-                } catch (IOException e) {
-                    e.printStackTrace();
-                    Log.w("warning", e.toString() );
+                        //constants
+                        URL url = new URL(serverurl + "/postreference");
+                        JSONObject jsonObject = new JSONObject();
 
-                } catch (Exception e) {
-                    e.printStackTrace();
-                    Log.w("warning", e.toString() );
-                } finally {
-                    if(conn!=null) {
-                        conn.disconnect();
+                        jsonObject.put("filename", m_Text);
+                        jsonObject.put("reference", reference_multiple);
+                        Log.w("lol", reference_multiple);
+
+                        String message = jsonObject.toString();
+
+                        conn = (HttpURLConnection) url.openConnection();
+                        conn.setReadTimeout(10000 /*milliseconds*/);
+                        conn.setConnectTimeout(15000 /* milliseconds */);
+                        conn.setRequestMethod("POST");
+                        conn.setDoInput(true);
+                        conn.setDoOutput(true);
+                        conn.setFixedLengthStreamingMode(message.getBytes().length);
+
+                        //make some HTTP header nicety
+                        conn.setRequestProperty("Content-Type", "application/json;charset=utf-8");
+                        //conn.setRequestProperty("X-Requested-With", "XMLHttpRequest");
+
+                        //  is.close();
+
+                        //open
+                        conn.connect();
+
+                        //setup send
+                        os = new BufferedOutputStream(conn.getOutputStream());
+                        os.write(message.getBytes());
+                        // Toast.makeText(DTWjava.this,message,Toast.LENGTH_LONG).show();
+                        //Log.w("MESSAGE", message);
+                        //clean up
+                        os.flush();
+
+                        //do somehting with response
+                        is = conn.getInputStream();
+                        StringBuffer sb = new StringBuffer();
+                        try {
+                            int chr;
+                            while ((chr = is.read()) != -1) {
+                                sb.append((char) chr);
+                            }
+                            String reply = sb.toString();
+                            Log.w("RESULY", reply);
+                        } finally {
+                            is.close();
+                        }
+                    } catch (IOException e) {
+                        e.printStackTrace();
+                        Log.w("warning", e.toString());
+
+                    } catch (Exception e) {
+                        e.printStackTrace();
+                        Log.w("warning", e.toString());
+                    } finally {
+                        if (conn != null) {
+                            conn.disconnect();
+                        }
                     }
+                reference_multiple="";
                 }
 
 
+                else
+                {
+                    reference_multiple=reference_multiple+reference+"\n";
+                }
+                referencecount=referencecount+1;
 
             }
         }
@@ -336,8 +361,10 @@ addreference();
 
         }
             }
+        };
 
-        }, 0, 10);
+        thread.start();
+
         progressBar.setVisibility(View.INVISIBLE);
     }
 
@@ -449,8 +476,10 @@ addreference();
 
     @Override
     public void onSensorChanged(SensorEvent event) {
-        if (event.sensor.getType()==Sensor.TYPE_ACCELEROMETER){
-            pressure=event.values[0];
+
+        if (event.sensor.getType()==Sensor.TYPE_PRESSURE){
+            Log.w("pressure", Double.toString(DTWjava.pressure) );
+            DTWjava.pressure=event.values[0];
             TextView pressuretext=findViewById(R.id.displaypressureit);
             pressuretext.setText(Double.toString(pressure));
 
