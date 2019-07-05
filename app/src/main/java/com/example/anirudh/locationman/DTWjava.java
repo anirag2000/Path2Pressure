@@ -7,6 +7,7 @@ import android.hardware.SensorEvent;
 import android.hardware.SensorEventListener;
 import android.hardware.SensorManager;
 import android.net.Uri;
+import android.os.AsyncTask;
 import android.support.v7.app.AlertDialog;
 import android.support.v7.app.AppCompatActivity;
 import android.os.Bundle;
@@ -41,20 +42,22 @@ import static android.provider.Telephony.Mms.Part.FILENAME;
 
 public class DTWjava extends AppCompatActivity  implements SensorEventListener {
     private SensorManager sensorManager;
-    String reference;
-    int count=0;
-    Uri uri;
-    int status=0;
-static double pressure;
-String serverurl="https://path2pressure-244816.appspot.com";
-int postcount=1;
-String dtwmp;
-static String m_Text;
-int referencecount=0;
-String reference_multiple="";
-    String inputref;
-    int countref = 0;
-    String realtimevalue="0\n";
+    volatile  String  reference;
+    volatile int count=0;
+    volatile  Uri uri;
+    volatile int status=0;
+    volatile static double pressure;
+    volatile String serverurl="https://path2pressure-244816.appspot.com";
+    volatile int postcount=1;
+    volatile String dtwmp;
+    volatile static String m_Text="";
+    volatile int referencecount=0;
+    volatile String reference_multiple="";
+    volatile String inputref;
+    volatile int countref = 0;
+    volatile static String realtimevalue="\n";
+    volatile static int countreference;
+    volatile static  int counter=0;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -118,65 +121,73 @@ addreference();
                 if(uri.toString().isEmpty())
                 {
                     Toast.makeText(DTWjava.this,"PLEASE UPLOAD REFERENCE",Toast.LENGTH_LONG).show();
+                    counter=0;
                 }
                 else
                 {
-                comparedata();
+    counter=1;
+                //comparedata();
             }}
         });
 
 
 
     }
+    /*
     void comparedata()
     {
 
-
-        Timer timer = new Timer();
-        timer.scheduleAtFixedRate(new TimerTask() {
-
+        Timer myTimer = new Timer();
+        myTimer.schedule(new TimerTask() {
             @Override
             public void run() {
-                Log.w("run", "run" );
 
-                    OutputStream os = null;
-                    InputStream is = null;
-                    HttpURLConnection conn = null;
-                    while(status==0) {
-                        try {
-                            if (status == 0) {
+                AsyncTask.execute(new Runnable() {
+                    @Override
+                    public void run() {
 
 
-                                Button button = findViewById(R.id.stop);
-                                button.setOnClickListener(new View.OnClickListener() {
-                                    @Override
-                                    public void onClick(View v) {
-                                        status = 1;
-                                    }
-                                });
 
-                                realtimevalue=realtimevalue+Double.toString(pressure)+"\n";
-                                if (postcount % 8 == 0) {
+                        Log.w("run", "run");
 
-                                    Log.w("run", "run: " );
+                        OutputStream os = null;
+                        InputStream is = null;
+                        HttpURLConnection conn = null;
+                        while (status == 0) {
+                            try {
+                                if (status == 0) {
+
+
+                                    Button button = findViewById(R.id.stop);
+                                    button.setOnClickListener(new View.OnClickListener() {
+                                        @Override
+                                        public void onClick(View v) {
+                                            status = 1;
+                                        }
+                                    });
+
+
+                                    Log.w("run", "run: ");
                                     //constants
                                     URL url = new URL(serverurl + "/postrealtime");
                                     JSONObject jsonObject = new JSONObject();
                                     jsonObject.put("filename", m_Text);
 
 
-                                    jsonObject.put("pressure", realtimevalue);
+                                    jsonObject.put("pressure", DTWjava.realtimevalue);
+                                    TextView tv2 = findViewById(R.id.displaypressureit);
+                                    tv2.setText(realtimevalue);
                                     String message = jsonObject.toString();
 
                                     conn = (HttpURLConnection) url.openConnection();
-                                    conn.setReadTimeout(10000 /*milliseconds*/);
-                                    conn.setConnectTimeout(15000 /* milliseconds */);
+
+
                                     conn.setRequestMethod("POST");
                                     conn.setDoInput(true);
                                     conn.setDoOutput(true);
                                     conn.setFixedLengthStreamingMode(message.getBytes().length);
 
-                                    //make some HTTP header nicety
+
                                     conn.setRequestProperty("Content-Type", "application/json;charset=utf-8");
                                     conn.setRequestProperty("X-Requested-With", "XMLHttpRequest");
 
@@ -184,7 +195,7 @@ addreference();
                                     conn.connect();
 
                                     //setup send
-                                    os = new BufferedOutputStream(conn.getOutputStream());
+                                    os=new BufferedOutputStream(conn.getOutputStream());
                                     os.write(message.getBytes());
                                     // Toast.makeText(DTWjava.this,message,Toast.LENGTH_LONG).show();
                                     //Log.w("MESSAGE", message);
@@ -210,38 +221,44 @@ addreference();
                                         }
                                         TextView textView = findViewById(R.id.dtwresult);
                                         textView.setText(dtwmp);
+                                        DTWjava.realtimevalue="";
 
                                     } finally {
                                         is.close();
                                     }
-                                    realtimevalue="0\n";
+                                    realtimevalue = "0\n";
+
+
+                                } else {
+                                    conn.disconnect();
+                                    break;
                                 }
 
+                            } catch (IOException e) {
+                                e.printStackTrace();
+                                Log.w("warning", e.toString());
+                                TextView tv2 = findViewById(R.id.displaypressureit);
+                                tv2.setText(e.toString());
+
+
+                            } catch (JSONException e) {
+                                e.printStackTrace();
+                                Log.w("warning", e.toString());
+                                TextView tv2 = findViewById(R.id.displaypressureit);
+                                tv2.setText(e.toString());
                             }
-                            else {
-                                conn.disconnect();
-                                break;
-                            }
-
-                        } catch (IOException e) {
-                            e.printStackTrace();
-                            Log.w("warning", e.toString());
-
-
-                        } catch (JSONException e) {
-                            e.printStackTrace();
-                            Log.w("warning", e.toString());
+                            postcount = postcount + 1;
                         }
-                        postcount=postcount+1;
-                    }
 
 
                     }
+                });
 
-
-        }, 0, 100);
+            }}, 0, 1000);
 
     }
+
+    */
 
     void addreference() {
         ProgressBar progressBar = findViewById(R.id.progressBar);
@@ -253,6 +270,8 @@ addreference();
         count = 0;
 
         checkfile();
+
+
 
         Thread thread = new Thread() {
             @Override
@@ -364,6 +383,8 @@ addreference();
         };
 
         thread.start();
+
+
 
         progressBar.setVisibility(View.INVISIBLE);
     }
@@ -478,10 +499,148 @@ addreference();
     public void onSensorChanged(SensorEvent event) {
 
         if (event.sensor.getType()==Sensor.TYPE_PRESSURE){
+            DTWjava.countreference+=1;
+
             Log.w("pressure", Double.toString(DTWjava.pressure) );
-            DTWjava.pressure=event.values[0];
+           pressure=event.values[0];
             TextView pressuretext=findViewById(R.id.displaypressureit);
-            pressuretext.setText(Double.toString(pressure));
+           // pressuretext.setText(Double.toString(pressure));
+            if(counter==1) {
+                DTWjava.realtimevalue = DTWjava.realtimevalue + Double.toString(pressure)+"\n";
+    try {
+        Thread.sleep(100);
+    }
+    catch (Exception e)
+    {
+        Log.w("realtime",e.toString());
+
+    }
+
+                if (DTWjava.countreference > 23) {
+                    DTWjava.countreference = 0;
+
+
+                            AsyncTask.execute(new Runnable() {
+                                @Override
+                                public void run() {
+                                    //TODO your background code
+
+
+                                    Log.w("run", "run");
+
+                                    OutputStream os = null;
+                                    InputStream is = null;
+                                    HttpURLConnection conn = null;
+                                    while (status == 0) {
+                                        try {
+                                            if (status == 0) {
+
+
+                                                Button button = findViewById(R.id.stop);
+                                                button.setOnClickListener(new View.OnClickListener() {
+                                                    @Override
+                                                    public void onClick(View v) {
+                                                        status = 1;
+                                                    }
+                                                });
+
+
+                                                Log.w("run ", DTWjava.realtimevalue);
+                                                //constants
+                                                URL url = new URL(serverurl + "/postrealtime");
+                                                JSONObject jsonObject = new JSONObject();
+                                                jsonObject.put("filename", m_Text);
+
+
+                                                jsonObject.put("pressure", realtimevalue);
+                                                TextView tv2 = findViewById(R.id.displaypressureit);
+                                                tv2.setText(realtimevalue);
+                                                realtimevalue = "\n";
+                                                String message = jsonObject.toString();
+
+                                                conn = (HttpURLConnection) url.openConnection();
+                                                conn.setReadTimeout(20000 /*milliseconds*/);
+                                                conn.setConnectTimeout(25000 /* milliseconds */);
+                                                conn.setRequestMethod("POST");
+                                                conn.setDoInput(true);
+                                                conn.setDoOutput(true);
+                                                conn.setFixedLengthStreamingMode(message.getBytes().length);
+
+                                                //make some HTTP header nicety
+                                                conn.setRequestProperty("Content-Type", "application/json;charset=utf-8");
+                                                conn.setRequestProperty("X-Requested-With", "XMLHttpRequest");
+
+                                                //open
+                                                conn.connect();
+
+                                                //setup send
+                                                os = new BufferedOutputStream(conn.getOutputStream());
+                                                os.write(message.getBytes());
+                                                // Toast.makeText(DTWjava.this,message,Toast.LENGTH_LONG).show();
+                                                //Log.w("MESSAGE", message);
+                                                //clean up
+                                                os.flush();
+
+
+                                                //do somehting with response
+                                                is = conn.getInputStream();
+                                                try {
+
+
+                                                    StringBuffer sb = new StringBuffer();
+                                                    int chr;
+                                                    while ((chr = is.read()) != -1) {
+                                                        sb.append((char) chr);
+                                                    }
+                                                    String reply = sb.toString();
+                                                    if (reply.equalsIgnoreCase("0")) {
+
+                                                    } else {
+                                                        dtwmp = reply;
+                                                    }
+                                                    TextView textView = findViewById(R.id.dtwresult);
+                                                    textView.setText(dtwmp);
+
+
+                                                } finally {
+                                                    is.close();
+                                                }
+
+
+
+                                            } else {
+                                                conn.disconnect();
+                                                Log.w("lol", "disconnecting" );
+                                                realtimevalue="";
+                                                break;
+                                            }
+
+                                        } catch (IOException e) {
+                                            e.printStackTrace();
+                                            Log.w("warning", e.toString());
+                                            TextView tv2 = findViewById(R.id.displaypressureit);
+                                            tv2.setText(e.toString());
+
+
+                                        } catch (JSONException e) {
+                                            e.printStackTrace();
+                                            Log.w("warning", e.toString());
+                                            TextView tv2 = findViewById(R.id.displaypressureit);
+                                            tv2.setText(e.toString());
+                                        }
+                                        postcount = postcount + 1;
+                                    }
+
+
+                                }
+                            });
+
+
+
+
+
+                }
+            }
 
         }
     }

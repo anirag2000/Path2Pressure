@@ -35,6 +35,13 @@ String m_Text;
                 dtw();
             }
         });
+        final Button cloud=findViewById(R.id.cloud);
+        cloud.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+             cloud();
+            }
+        });
     }
     void test() {
 
@@ -72,7 +79,12 @@ String m_Text;
 
     void dtw()
     {
-        Intent intent=new Intent(Home.this,DTWjava.class);
+        Intent intent=new Intent(Home.this,Main2Activity.class);
+        startActivity(intent);
+    }
+    void cloud()
+    {
+        Intent intent=new Intent(Home.this,cloud.class);
         startActivity(intent);
     }
 

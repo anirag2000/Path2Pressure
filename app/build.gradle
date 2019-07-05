@@ -33,16 +33,14 @@ dependencies {
     testImplementation 'junit:junit:4.12'
     androidTestImplementation 'com.android.support.test:runner:1.0.2'
     androidTestImplementation 'com.android.support.test.espresso:espresso-core:3.0.2'
-    implementation 'com.yayandroid:LocationManager:1.0.0'
-    implementation 'io.nlopez.smartlocation:library:3.3.3'
-    implementation 'io.nlopez.smartlocation:rx:3.3.3'
+
     implementation 'com.opencsv:opencsv:3.9'
     implementation 'org.apache.commons:commons-io:1.3.2'
     implementation 'com.github.KalebKE:FSensor:v1.2.1'
     implementation 'io.reactivex.rxjava2:rxandroid:2.1.0'
     implementation 'io.reactivex.rxjava2:rxjava:2.2.0'
 
-
-
-
+    implementation('com.android.support:support-v4:28.0.0')
+    implementation 'com.fusedbulb.lib:fusedbulblib:1.0.3'
+    implementation 'com.airbnb.android:airmapview:1.8.0'
 }

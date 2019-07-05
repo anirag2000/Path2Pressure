@@ -10,19 +10,20 @@
         android:id="@+id/selectfile"
         android:layout_width="152dp"
         android:layout_height="50dp"
-        android:layout_marginStart="148dp"
-        android:layout_marginEnd="148dp"
-        android:layout_marginBottom="380dp"
+        android:layout_marginStart="16dp"
+        android:layout_marginTop="20dp"
+        android:layout_marginEnd="40dp"
+        android:layout_marginBottom="46dp"
         android:text="Select File"
-        app:layout_constraintBottom_toBottomOf="parent"
-        app:layout_constraintEnd_toEndOf="parent"
-        app:layout_constraintHorizontal_bias="0.492"
-        app:layout_constraintStart_toStartOf="parent" />
+        app:layout_constraintBottom_toTopOf="@+id/displaypressureit"
+        app:layout_constraintEnd_toStartOf="@+id/uploadfile"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toBottomOf="@+id/filename" />
 
     <TextView
         android:id="@+id/filename"
-        android:layout_width="234dp"
-        android:layout_height="41dp"
+        android:layout_width="326dp"
+        android:layout_height="75dp"
         android:layout_marginStart="74dp"
         android:layout_marginTop="24dp"
         android:layout_marginEnd="76dp"
@@ -33,7 +34,7 @@
         android:textSize="20sp"
         app:layout_constraintBottom_toTopOf="@+id/selectfile"
         app:layout_constraintEnd_toEndOf="parent"
-        app:layout_constraintHorizontal_bias="0.0"
+        app:layout_constraintHorizontal_bias="0.51"
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintTop_toTopOf="parent"
         app:layout_constraintVertical_bias="1.0" />
@@ -42,22 +43,21 @@
         android:id="@+id/uploadfile"
         android:layout_width="152dp"
         android:layout_height="50dp"
-        android:layout_marginStart="8dp"
+        android:layout_marginStart="40dp"
         android:layout_marginTop="8dp"
-        android:layout_marginEnd="110dp"
+        android:layout_marginEnd="24dp"
         android:layout_marginBottom="316dp"
         android:text="Upload File"
         app:layout_constraintBottom_toBottomOf="parent"
         app:layout_constraintEnd_toEndOf="parent"
-        app:layout_constraintHorizontal_bias="0.956"
-        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintStart_toEndOf="@+id/selectfile"
         app:layout_constraintTop_toTopOf="parent"
-        app:layout_constraintVertical_bias="0.978" />
+        app:layout_constraintVertical_bias="0.613" />
 
     <TextView
         android:id="@+id/displaypressureit"
-        android:layout_width="264dp"
-        android:layout_height="79dp"
+        android:layout_width="416dp"
+        android:layout_height="167dp"
         android:layout_marginStart="55dp"
         android:layout_marginTop="39dp"
         android:layout_marginEnd="54dp"
@@ -66,10 +66,10 @@
         android:text="TextView"
         app:layout_constraintBottom_toBottomOf="parent"
         app:layout_constraintEnd_toEndOf="parent"
-        app:layout_constraintHorizontal_bias="0.454"
+        app:layout_constraintHorizontal_bias="0.354"
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintTop_toBottomOf="@+id/uploadfile"
-        app:layout_constraintVertical_bias="0.263" />
+        app:layout_constraintVertical_bias="0.0" />
 
     <Button
         android:id="@+id/start"
@@ -84,7 +84,7 @@
         app:layout_constraintEnd_toStartOf="@+id/stop"
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintTop_toBottomOf="@+id/displaypressureit"
-        app:layout_constraintVertical_bias="0.0" />
+        app:layout_constraintVertical_bias="1.0" />
 
     <TextView
         android:id="@+id/dtwresult"
@@ -113,7 +113,8 @@
         app:layout_constraintBottom_toTopOf="@+id/dtwresult"
         app:layout_constraintEnd_toEndOf="parent"
         app:layout_constraintStart_toEndOf="@+id/start"
-        app:layout_constraintTop_toBottomOf="@+id/displaypressureit" />
+        app:layout_constraintTop_toBottomOf="@+id/displaypressureit"
+        app:layout_constraintVertical_bias="1.0" />
 
     <ProgressBar
         android:id="@+id/progressBar"

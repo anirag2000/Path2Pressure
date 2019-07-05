@@ -1,9 +1,14 @@
 package com.example.anirudh.locationman;
 
 import android.Manifest;
+import android.content.ActivityNotFoundException;
+import android.content.BroadcastReceiver;
+import android.content.ComponentName;
 import android.content.Context;
 import android.content.DialogInterface;
 import android.content.Intent;
+import android.content.IntentFilter;
+import android.content.ServiceConnection;
 import android.content.pm.PackageManager;
 
 import android.hardware.Sensor;
@@ -12,28 +17,49 @@ import android.hardware.SensorEventListener;
 import android.hardware.SensorManager;
 import android.location.Location;
 
+import android.net.Uri;
 import android.os.Handler;
 import android.graphics.Bitmap;
 import android.graphics.Color;
 import android.graphics.Paint;
 import android.graphics.RectF;
+import android.os.IBinder;
+import android.support.annotation.NonNull;
+import android.support.annotation.Nullable;
+import android.support.v4.app.ActivityCompat;
+import android.support.v4.content.LocalBroadcastManager;
 import android.support.v7.app.AlertDialog;
 import android.support.v7.app.AppCompatActivity;
 import android.os.Bundle;
+import android.telephony.CellIdentityGsm;
+import android.telephony.CellIdentityLte;
+import android.telephony.CellIdentityWcdma;
+import android.telephony.CellInfo;
+import android.telephony.CellInfoGsm;
+import android.telephony.CellInfoLte;
+import android.telephony.CellInfoWcdma;
+import android.telephony.TelephonyManager;
 import android.text.InputType;
 import android.util.Log;
 import android.view.View;
+import android.view.WindowManager;
 import android.widget.Button;
 import android.widget.EditText;
+import android.widget.TextView;
 import android.widget.Toast;
 
 
+import com.fusedbulblib.GetCurrentLocation;
+import com.fusedbulblib.interfaces.GpsOnListener;
 import com.kircherelectronics.fsensor.filter.gyroscope.fusion.kalman.OrientationFusedKalman;
 import com.kircherelectronics.fsensor.linearacceleration.LinearAcceleration;
 import com.kircherelectronics.fsensor.linearacceleration.LinearAccelerationFusion;
 import com.kircherelectronics.fsensor.sensor.FSensor;
 import com.kircherelectronics.fsensor.sensor.acceleration.KalmanLinearAccelerationSensor;
 import com.kircherelectronics.fsensor.util.rotation.RotationUtil;
+
+
+
 
 import java.io.File;
 import java.io.FileWriter;
@@ -43,19 +69,22 @@ import java.text.SimpleDateFormat;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.Calendar;
+import java.util.List;
 
-import io.nlopez.smartlocation.OnLocationUpdatedListener;
-import io.nlopez.smartlocation.SmartLocation;
+
 import io.reactivex.subjects.PublishSubject;
 
-public class MainActivity extends AppCompatActivity implements FSensor,SensorEventListener {
 
 
+
+
+public class MainActivity extends AppCompatActivity implements FSensor,SensorEventListener,GpsOnListener {
+    public String cidcomb="";
     private SensorManager sensorManager;
     private SimpleSensorListener listener;
     private float startTime = 0;
     private int count = 0;
-
+volatile String celltower="";
     private boolean hasRotation = false;
     private boolean hasMagnetic = false;
 
@@ -65,6 +94,7 @@ public class MainActivity extends AppCompatActivity implements FSensor,SensorEve
     private float[] acceleration = new float[3];
     private float[] output = new float[4];
 
+
     private LinearAcceleration linearAccelerationFilterKalman;
     private OrientationFusedKalman orientationFusionKalman;
 
@@ -72,32 +102,37 @@ public class MainActivity extends AppCompatActivity implements FSensor,SensorEve
 
     private PublishSubject<float[]> publishSubject;
 
-    // private  final String tag = GaugeAcceleration.class.getSimpleName();
+   ///
 
-    // holds the cached static part
-    private Bitmap background;
+   public static int mcc;            // Mobile Country Code
 
-    private Paint backgroundPaint;
-    private Paint pointPaint;
-    private Paint rimPaint;
-    private Paint rimShadowPaint;
+    static int mnc;            // Mobile Network Code
 
-    private RectF faceRect;
-    private RectF rimRect;
-    private RectF rimOuterRect;
-    private RectF innerRim;
-    private RectF innerFace;
-    private RectF innerMostDot;
+    static int lac;            // Location Area Code or TAC(Tracking Area Code) for LTE
 
-    private float x;
-    private float y;
+    static int cid;            // Cell Identity
 
-    private float scaleX;
-    private float scaleY;
 
-    private int color = Color.parseColor("#2196F3");
+    static int bsic_psc_pci;   /* bsic for GSM, psc for WCDMA, pci for LTE,
+                                   GSM has #getPsc() but always get Integer.MAX_VALUE,
+                                   psc is undefined for GSM */
+
+
+
+
+
+    static int signalLevel;    // Signal level as an int from 0..4
+
+    static int dbm;            // Signal strength as dBm
+
+    static String celltype;
+
+    ///
+
+
     static  String m_Text;
     double velocity;
+    TelephonyManager telephonyManager;
     double latitude = 0.0;
     double longitude = 0.0;
     Handler handler;
@@ -119,12 +154,34 @@ public class MainActivity extends AppCompatActivity implements FSensor,SensorEve
     int poll;
     GaugeAcceleration gaugeAcceleration;
     double Ax,Ay,Az;
+   GetCurrentLocation getCurrentLocation;
+
+    private TextView location, latLong, diff;
+    private Double lati, longi;
+
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
          gaugeAcceleration=new GaugeAcceleration(getApplicationContext());
+         BaseStation baseStation=new BaseStation();
+        telephonyManager = (TelephonyManager) getSystemService(Context.TELEPHONY_SERVICE);
+        getWindow().addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
+
+        getCurrentLocation=new GetCurrentLocation(this);
+
+        getCurrentLocation.getContinuousLocation(true);
+        getCurrentLocation.getCurrentLocation();
+
+
+
+
+
+        ////location
+
+
+
         SensorManager sensorManager;
         sensorManager = (SensorManager) getSystemService(SENSOR_SERVICE);
         if (sensorManager.getDefaultSensor(Sensor.TYPE_GRAVITY) != null) {
@@ -213,6 +270,7 @@ public class MainActivity extends AppCompatActivity implements FSensor,SensorEve
     }
 
 
+
     void onstartclick() {
         Button button = findViewById(R.id.button2);
 
@@ -244,22 +302,7 @@ public class MainActivity extends AppCompatActivity implements FSensor,SensorEve
                     fw.append("TIME");
                     fw.append(',');
 
-                    fw.append("Ax");
-                    fw.append(',');
 
-                    fw.append("Ay");
-                    fw.append(',');
-
-                    fw.append("Az");
-                    fw.append(',');
-                    fw.append("Gx");
-                    fw.append(',');
-
-                    fw.append("Gy");
-                    fw.append(',');
-
-                    fw.append("Gz");
-                    fw.append(',');
                     fw.append("Path");
                     fw.append(',');
 
@@ -272,6 +315,8 @@ public class MainActivity extends AppCompatActivity implements FSensor,SensorEve
 
 
                     fw.append("Pressure");
+                    fw.append(',');
+                    fw.append("CellTower");
                     fw.append(',');
                     fw.append('\n');
                     startTime = 0;
@@ -299,7 +344,17 @@ public class MainActivity extends AppCompatActivity implements FSensor,SensorEve
 
         final Runnable r = new Runnable() {
             public void run() {
-                getLocation();
+
+
+
+
+
+
+
+
+               // getLocation();
+                showCellinfo();
+
                 Button pathchange=findViewById(R.id.path_change);
                 pathchange.setOnClickListener(new View.OnClickListener() {
                     @Override
@@ -375,7 +430,7 @@ public class MainActivity extends AppCompatActivity implements FSensor,SensorEve
 
     }
 
-
+/*
     void getLocation() {
 
 
@@ -438,6 +493,7 @@ public class MainActivity extends AppCompatActivity implements FSensor,SensorEve
                     }
                 });
     }
+    */
 
 
     private void exportTheDB() {
@@ -453,22 +509,7 @@ public class MainActivity extends AppCompatActivity implements FSensor,SensorEve
             fw.append(strDate);
             fw.append(',');
 
-            fw.append(Double.toString(ax));
-            fw.append(',');
-
-            fw.append(Double.toString(ay));
-            fw.append(',');
-
-            fw.append(Double.toString(az));
-            fw.append(',');
-            fw.append(Double.toString(gx));
-            fw.append(',');
-
-            fw.append(Double.toString(gy));
-            fw.append(',');
-
-            fw.append(Double.toString(gz));
-            fw.append(',');
+            
             fw.append(Character.toString(path));
             fw.append(',');
 
@@ -480,6 +521,10 @@ public class MainActivity extends AppCompatActivity implements FSensor,SensorEve
 
 
             fw.append(Double.toString(pressure));
+            fw.append(',');
+            fw.append(cidcomb);
+            cidcomb="";
+
             fw.append(',');
 
             //Toast.makeText(MainActivity.this,"ERITITNT", Toast.LENGTH_LONG).show();
@@ -639,4 +684,139 @@ Toast.makeText(MainActivity.this,"workimg", (Toast.LENGTH_LONG)).show();
         public void onAccuracyChanged(Sensor sensor, int accuracy) {
         }
     }
+    public void showCellinfo() {
+        TextView tv = findViewById(R.id.textView);
+        List<CellInfo> cellInfoList = null;
+        if (ActivityCompat.checkSelfPermission(this, Manifest.permission.ACCESS_COARSE_LOCATION) != PackageManager.PERMISSION_GRANTED) {
+            // TODO: Consider calling
+            //    ActivityCompat#requestPermissions
+            // here to request the missing permissions, and then overriding
+            //   public void onRequestPermissionsResult(int requestCode, String[] permissions,
+            //                                          int[] grantResults)
+            // to handle the case where the user grants the permission. See the documentation
+            // for ActivityCompat#requestPermissions for more details.
+
+            return;
+        }
+
+        cellInfoList = telephonyManager.getAllCellInfo();
+        if (cellInfoList == null) {
+            Log.w("cellinfo", "showCellinfo: " );
+
+        } else if (cellInfoList.size() == 0) {
+
+        } else {
+            int cellNumber = cellInfoList.size();
+            BaseStation main_BS = bindData(cellInfoList.get(0));
+            tv.setText( main_BS.toString());
+
+            for (CellInfo cellInfo : cellInfoList) {
+                BaseStation bs = bindData(cellInfo);
+                //Log.i(TAG, bs.toString());
+                String cs=cellInfo.toString().substring(25,28);
+                if(cs.equalsIgnoreCase("YES"))
+                {
+                    cidcomb=cidcomb+cellInfo.toString().substring(137,142)+".";
+                }
+                else if(cs.equalsIgnoreCase("NO "))
+                {
+                    cidcomb=cidcomb+cellInfo.toString().substring(132,137)+".";
+                }
+
+            }
+            Log.w("cell", cidcomb );
+        }
+
+    }
+
+    private BaseStation bindData(CellInfo cellInfo) {
+        BaseStation baseStation = null;
+        //基站有不同信号类型：2G，3G，4G
+        if (cellInfo instanceof CellInfoWcdma) {
+            //联通3G
+            CellInfoWcdma cellInfoWcdma = (CellInfoWcdma) cellInfo;
+            CellIdentityWcdma cellIdentityWcdma = cellInfoWcdma.getCellIdentity();
+            baseStation = new BaseStation();
+            baseStation.setType("WCDMA");
+            baseStation.setCid(cellIdentityWcdma.getCid());
+            baseStation.setLac(cellIdentityWcdma.getLac());
+            baseStation.setMcc(cellIdentityWcdma.getMcc());
+            baseStation.setMnc(cellIdentityWcdma.getMnc());
+            baseStation.setBsic_psc_pci(cellIdentityWcdma.getPsc());
+            if (cellInfoWcdma.getCellSignalStrength() != null) {
+                baseStation.setAsuLevel(cellInfoWcdma.getCellSignalStrength().getAsuLevel()); //Get the signal level as an asu value between 0..31, 99 is unknown Asu is calculated based on 3GPP RSRP.
+                baseStation.setSignalLevel(cellInfoWcdma.getCellSignalStrength().getLevel()); //Get signal level as an int from 0..4
+                baseStation.setDbm(cellInfoWcdma.getCellSignalStrength().getDbm()); //Get the signal strength as dBm
+            }
+        } else if (cellInfo instanceof CellInfoLte) {
+            //4G
+            CellInfoLte cellInfoLte = (CellInfoLte) cellInfo;
+            CellIdentityLte cellIdentityLte = cellInfoLte.getCellIdentity();
+            baseStation = new BaseStation();
+            baseStation.setType("LTE");
+            baseStation.setCid(cellIdentityLte.getCi());
+            baseStation.setMnc(cellIdentityLte.getMnc());
+            baseStation.setMcc(cellIdentityLte.getMcc());
+            baseStation.setLac(cellIdentityLte.getTac());
+            baseStation.setBsic_psc_pci(cellIdentityLte.getPci());
+            if (cellInfoLte.getCellSignalStrength() != null) {
+                baseStation.setAsuLevel(cellInfoLte.getCellSignalStrength().getAsuLevel());
+                baseStation.setSignalLevel(cellInfoLte.getCellSignalStrength().getLevel());
+                baseStation.setDbm(cellInfoLte.getCellSignalStrength().getDbm());
+            }
+        } else if (cellInfo instanceof CellInfoGsm) {
+            //2G
+            CellInfoGsm cellInfoGsm = (CellInfoGsm) cellInfo;
+            CellIdentityGsm cellIdentityGsm = cellInfoGsm.getCellIdentity();
+            baseStation = new BaseStation();
+            baseStation.setType("GSM");
+            baseStation.setCid(cellIdentityGsm.getCid());
+            baseStation.setLac(cellIdentityGsm.getLac());
+            baseStation.setMcc(cellIdentityGsm.getMcc());
+            baseStation.setMnc(cellIdentityGsm.getMnc());
+            baseStation.setBsic_psc_pci(cellIdentityGsm.getPsc());
+            if (cellInfoGsm.getCellSignalStrength() != null) {
+                baseStation.setAsuLevel(cellInfoGsm.getCellSignalStrength().getAsuLevel());
+                baseStation.setSignalLevel(cellInfoGsm.getCellSignalStrength().getLevel());
+                baseStation.setDbm(cellInfoGsm.getCellSignalStrength().getDbm());
+            }
+        } else {
+            //电信2/3G
+            //Log.e(TAG, "CDMA CellInfo................................................");
+        }
+        return baseStation;
+    }
+    @Override
+    public void gpsStatus(boolean _status) {
+        Log.w("FusedBuld GpsStatus",_status+"");
+        if (_status==true){
+            getCurrentLocation.getContinuousLocation(true);
+            getCurrentLocation.getCurrentLocation();
+        }
+    }
+
+    @Override
+    public void gpsPermissionDenied(int deviceGpsPermission) {
+        Log.w("FusedBuld GpsPermission",deviceGpsPermission+"");
+    }
+
+    @Override
+    public void gpsLocationFetched(Location location) {
+        Log.w("FusedBuld location",location.getLatitude()+"--"+location.getLongitude());
+        latitude=location.getLatitude();
+        longitude=location.getLongitude();
+
+    }
+
+    @Override
+    public void onDestroy() {
+        super.onDestroy();
+        getCurrentLocation.stopLocationUpdate();
+        getWindow().clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
+    }
+
+
+
+
+
 }

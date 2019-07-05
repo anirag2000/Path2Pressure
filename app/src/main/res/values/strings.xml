@@ -1,4 +1,5 @@
 <resources>
     <string name="app_name">mil</string>
     <string name="title_activity_home_screen">HomeScreen</string>
+    <string name="title_activity_maps">Map</string>
 </resources>
