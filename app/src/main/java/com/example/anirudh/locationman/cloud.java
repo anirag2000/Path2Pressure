@@ -2,6 +2,7 @@ package com.example.anirudh.locationman;
 
 import android.content.DialogInterface;
 import android.content.Intent;
+import android.content.res.Resources;
 import android.net.Uri;
 import android.support.v7.app.AlertDialog;
 import android.support.v7.app.AppCompatActivity;
@@ -15,17 +16,24 @@ import android.widget.ProgressBar;
 import android.widget.TextView;
 import android.widget.Toast;
 
+import butterknife.BindView;
+import butterknife.ButterKnife;
+
+
 import com.opencsv.CSVReader;
 
 import org.json.JSONObject;
 
 import java.io.BufferedOutputStream;
+import java.io.BufferedReader;
 import java.io.FileReader;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
 import java.net.HttpURLConnection;
 import java.net.URL;
+
+import is.arontibo.library.ElasticDownloadView;
 
 public class cloud extends AppCompatActivity {
     Uri uri;
@@ -37,21 +45,32 @@ public class cloud extends AppCompatActivity {
     volatile String reference_pressure;
     volatile String reference_latitude;
     volatile String reference_longitude;
+    volatile String reference_cell;
 
-    volatile String serverurl="https://path2pressure-244816.appspot.com";
+
+
+    volatile String serverurl;
     volatile int countref = 0;
     volatile static String realtimevalue="\n";
     volatile static int countreference;
     volatile static  int count=0;
+    volatile static  int refcount=0;
     ProgressBar progressBar;
+    @BindView(R.id.elastic_download_view) ElasticDownloadView mElasticDownloadView;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_cloud);
+        Resources res = getResources();
+        showFileChooser();
+        ButterKnife.bind(this);
 
- progressBar=findViewById(R.id.progressBar2);
-progressBar.setVisibility(View.INVISIBLE);
+
+
+        serverurl=res.getString(R.string.url);
+ //progressBar=findViewById(R.id.progressBar2);
+//progressBar.setVisibility(View.INVISIBLE);
 Button select=findViewById(R.id.selectfile);
 Button upload=findViewById(R.id.upload);
         AlertDialog.Builder builder = new AlertDialog.Builder(this);
@@ -79,18 +98,13 @@ Button upload=findViewById(R.id.upload);
             }
         });
 builder.show();
-select.setOnClickListener(new View.OnClickListener() {
-    @Override
-    public void onClick(View v) {
-        showFileChooser();
-    }
-});
+
 upload.setOnClickListener(new View.OnClickListener() {
     @Override
     public void onClick(View v) {
-        progressBar.setVisibility(View.VISIBLE);
+       // progressBar.setVisibility(View.VISIBLE);
         addreference();
-        progressBar.setVisibility(View.INVISIBLE);
+        //progressBar.setVisibility(View.INVISIBLE);
     }
 });
 
@@ -151,6 +165,7 @@ upload.setOnClickListener(new View.OnClickListener() {
 
 
 
+        mElasticDownloadView.startIntro();
 
 
         Thread thread = new Thread() {
@@ -173,9 +188,10 @@ upload.setOnClickListener(new View.OnClickListener() {
                         reference_pressure=nextLine[4];
                         reference_latitude=nextLine[2];
                         reference_longitude=nextLine[3];
+                        reference_cell=nextLine[5];
 
 
-                        if(referencecount%80==0 ) {
+
 
 
                             OutputStream os = null;
@@ -185,11 +201,12 @@ upload.setOnClickListener(new View.OnClickListener() {
                                 //constants
                                 URL url = new URL(serverurl + "/postreference");
                                 JSONObject jsonObject = new JSONObject();
-
+                                Log.w("warning", reference_multiple_pressure );
                                 jsonObject.put("filename", m_Text);
-                                jsonObject.put("reference", reference_multiple_pressure);
-                                jsonObject.put("latitude", reference_multiple_latitude);
-                                jsonObject.put("longitude", reference_multiple_longitude);
+                                jsonObject.put("reference", reference_pressure);
+                                jsonObject.put("latitude", reference_latitude);
+                                jsonObject.put("longitude", reference_longitude);
+                                jsonObject.put("cell", reference_cell);
                                 Log.w("lol", reference_multiple_pressure);
 
                                 String message = jsonObject.toString();
@@ -227,8 +244,37 @@ upload.setOnClickListener(new View.OnClickListener() {
                                     while ((chr = is.read()) != -1) {
                                         sb.append((char) chr);
                                     }
-                                    String reply = sb.toString();
-                                    Log.w("RESULY", reply);
+                                    final String reply = sb.toString();
+
+
+                                    runOnUiThread(new Runnable() {
+                                        @Override
+                                        public void run() {
+                                            try
+                                            {
+                                                BufferedReader bufferedReader = new BufferedReader(new FileReader(uri.getLastPathSegment().substring(5)));
+                                                String input;
+                                                refcount=0;
+                                                while((input = bufferedReader.readLine()) != null)
+                                                {
+                                                    refcount++;
+
+                                                }
+                                            }
+                                            catch (Exception e)
+                                            {
+                                                Log.w("warning", e.toString());
+                                            }
+                                            Log.w("warning", Integer.toString(refcount));
+
+
+                                            double per=(Integer.parseInt(reply.trim()))*(100);
+                                           double percent=per/(refcount);
+                                            Log.w("RESULYQWE", reply+","+Integer.toString(refcount));
+                                            Log.w("lol", Double.toString(per)+","+Double.toString(percent));
+                                            mElasticDownloadView.setProgress((int)percent);
+                                        }
+                                    });
 
 
                                 } finally {
@@ -246,24 +292,16 @@ upload.setOnClickListener(new View.OnClickListener() {
                                     conn.disconnect();
                                 }
                             }
-                            reference_multiple_pressure="";
-                            reference_multiple_latitude="";
-                            reference_multiple_longitude="";
+
                         }
 
 
-                        else
-                        {
-                            reference_multiple_pressure=reference_multiple_pressure+reference_pressure+"\n";
-                            reference_multiple_latitude=reference_multiple_latitude+reference_latitude+"\n";
-                            reference_multiple_longitude=reference_multiple_longitude+reference_longitude+"\n";
-                        }
-                        referencecount=referencecount+1;
 
-                    }
+
+
 
                     display.setText("UPLOAD COMPLETED SUCCESSFULLY");
-                    Intent intent=new Intent(cloud.this,Home.class);
+                    Intent intent=new Intent(cloud.this,Main2Activity.class);
                     startActivity(intent);
                 }
                 catch (IOException e)

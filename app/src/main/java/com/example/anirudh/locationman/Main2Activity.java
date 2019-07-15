@@ -1,15 +1,19 @@
 package com.example.anirudh.locationman;
 
 import android.content.Intent;
+import android.content.res.Resources;
 import android.os.Handler;
 import android.os.Looper;
 import android.support.v7.app.AppCompatActivity;
 import android.os.Bundle;
 import android.util.Log;
+import android.view.Menu;
+import android.view.MenuItem;
 import android.view.View;
 import android.widget.AdapterView;
 import android.widget.ArrayAdapter;
 import android.widget.Button;
+import android.widget.ListView;
 import android.widget.Spinner;
 import android.widget.Toast;
 
@@ -22,16 +26,25 @@ import java.net.HttpURLConnection;
 import java.net.URL;
 
 public class Main2Activity extends AppCompatActivity {
-    volatile String serverurl="https://path2pressure-244816.appspot.com";
+
+
+    volatile String serverurl;
    volatile String [] filenames;
     volatile String [] latlong;
     volatile Spinner s;
     volatile  String name;
     Button submit;
+    ListView listView;
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
+
+
         setContentView(R.layout.activity_main2);
+        listView=findViewById(R.id.list_view);
+
+        Resources res = getResources();
+        serverurl=res.getString(R.string.url);
         submit=findViewById(R.id.button6);
         submit.setOnClickListener(new View.OnClickListener() {
             @Override
@@ -39,22 +52,10 @@ public class Main2Activity extends AppCompatActivity {
                 getlatlong();
             }
         });
-        Spinner s = (Spinner) findViewById(R.id.spinner);
+
         listfile();
 
-        s.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener()
-        {
-            @Override
-            public void onItemSelected(AdapterView<?> arg0, View arg1, int position, long id) {
-                // TODO Auto-generated method stub
-                name=filenames[position];
-            }
 
-            @Override
-            public void onNothingSelected(AdapterView<?> arg0) {
-                // TODO Auto-generated method stub
-            }
-        });
     }
     int listfile() {
         new Thread(new Runnable() {
@@ -111,13 +112,26 @@ public class Main2Activity extends AppCompatActivity {
                             new Handler(Looper.getMainLooper()).post(new Runnable() {
                                 @Override
                                 public void run() {
-                                    Spinner s = findViewById(R.id.spinner);
+
+                                    listView=findViewById(R.id.list_view);
+                                    ArrayAdapter<String> adapter = new ArrayAdapter<String>(Main2Activity.this, android.R.layout.simple_list_item_single_choice,filenames);
 
 
-                                    ArrayAdapter<String> adp1 = new ArrayAdapter<>(Main2Activity.this,
-                                            android.R.layout.simple_list_item_1, filenames);
-                                    adp1.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
-                                    s.setAdapter(adp1);
+
+                                    listView.setAdapter(adapter);
+                                    listView.setOnItemClickListener(new AdapterView.OnItemClickListener() {
+                                        @Override
+                                        public void onItemClick(AdapterView<?> parent, View view, int position, long id) {
+                                            name=filenames[position];
+                                        }
+                                    });
+                                    listView.setOnLongClickListener(new View.OnLongClickListener() {
+                                        @Override
+                                        public boolean onLongClick(View v) {
+                                            return false;
+                                        }
+                                    });
+
                                 }
                             });
 
@@ -166,7 +180,7 @@ public class Main2Activity extends AppCompatActivity {
                         JSONObject jsonObject = new JSONObject();
                         jsonObject.put("filename", name);
 
-                        Log.w("lol", " " + "lol");
+                        Log.w("lol", name);
 
                         String message = jsonObject.toString();
 
@@ -201,8 +215,10 @@ public class Main2Activity extends AppCompatActivity {
                             }
                             String reply = sb.toString();
                             Log.w("lol", reply );
-                          Intent intent=new Intent(Main2Activity.this,DTWjava.class);
-                           startActivity(intent);
+                          Intent intent=new Intent(Main2Activity.this,RealtimeMap.class);
+                          intent.putExtra("latlong",reply);
+                            intent.putExtra("filename",name);
+                          startActivity(intent);
 
 
 
@@ -228,6 +244,31 @@ public class Main2Activity extends AppCompatActivity {
             }
         }).start();
 
+    }
+    @Override
+    public boolean onCreateOptionsMenu(Menu menu) {
+        // Inflate the menu; this adds items to the action bar if it is present.
+        getMenuInflater().inflate(R.menu.menu, menu);
+        return true;
+    }
+    @Override
+    public boolean onOptionsItemSelected(MenuItem item) {
+        // Handle action bar item clicks here. The action bar will
+        // automatically handle clicks on the Home/Up button, so long
+        // as you specify a parent activity in AndroidManifest.xml.
+        int id = item.getItemId();
+
+        //noinspection SimplifiableIfStatement
+        if (id == R.id.cloud) {
+           Intent intent=new Intent(Main2Activity.this,cloud.class);
+           startActivity(intent);
+        }
+        else if (id == R.id.add) {
+            Intent intent=new Intent(Main2Activity.this,MainActivity.class);
+            startActivity(intent);
+        }
+
+        return super.onOptionsItemSelected(item);
     }
 
 

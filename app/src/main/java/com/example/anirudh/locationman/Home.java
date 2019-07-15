@@ -6,9 +6,13 @@ import android.support.v7.app.AlertDialog;
 import android.support.v7.app.AppCompatActivity;
 import android.os.Bundle;
 import android.text.InputType;
+import android.util.Log;
 import android.view.View;
 import android.widget.Button;
 import android.widget.EditText;
+
+import com.google.android.gms.common.ConnectionResult;
+import com.google.android.gms.common.GoogleApiAvailability;
 
 public class Home extends AppCompatActivity {
 String m_Text;
@@ -20,7 +24,6 @@ String m_Text;
         test.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
-
 
 
 
@@ -79,6 +82,8 @@ String m_Text;
 
     void dtw()
     {
+
+
         Intent intent=new Intent(Home.this,Main2Activity.class);
         startActivity(intent);
     }

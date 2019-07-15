@@ -47,7 +47,7 @@ public class DTWjava extends AppCompatActivity  implements SensorEventListener {
     volatile  Uri uri;
     volatile int status=0;
     volatile static double pressure;
-    volatile String serverurl="https://path2pressure-244816.appspot.com";
+    volatile String serverurl="http://34.93.14.104:80";
     volatile int postcount=1;
     volatile String dtwmp;
     volatile static String m_Text="";

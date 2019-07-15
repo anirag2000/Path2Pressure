@@ -11,6 +11,7 @@ import android.content.IntentFilter;
 import android.content.ServiceConnection;
 import android.content.pm.PackageManager;
 
+import android.content.res.Resources;
 import android.hardware.Sensor;
 import android.hardware.SensorEvent;
 import android.hardware.SensorEventListener;
@@ -57,13 +58,20 @@ import com.kircherelectronics.fsensor.linearacceleration.LinearAccelerationFusio
 import com.kircherelectronics.fsensor.sensor.FSensor;
 import com.kircherelectronics.fsensor.sensor.acceleration.KalmanLinearAccelerationSensor;
 import com.kircherelectronics.fsensor.util.rotation.RotationUtil;
+import com.opencsv.CSVReader;
 
 
+import org.json.JSONObject;
 
-
+import java.io.BufferedOutputStream;
 import java.io.File;
+import java.io.FileReader;
 import java.io.FileWriter;
 import java.io.IOException;
+import java.io.InputStream;
+import java.io.OutputStream;
+import java.net.HttpURLConnection;
+import java.net.URL;
 import java.text.DecimalFormat;
 import java.text.SimpleDateFormat;
 import java.time.Duration;
@@ -155,6 +163,7 @@ volatile String celltower="";
     GaugeAcceleration gaugeAcceleration;
     double Ax,Ay,Az;
    GetCurrentLocation getCurrentLocation;
+    volatile String serverurl;
 
     private TextView location, latLong, diff;
     private Double lati, longi;
@@ -164,6 +173,8 @@ volatile String celltower="";
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
+        Resources res = getResources();
+        serverurl=res.getString(R.string.url);
          gaugeAcceleration=new GaugeAcceleration(getApplicationContext());
          BaseStation baseStation=new BaseStation();
         telephonyManager = (TelephonyManager) getSystemService(Context.TELEPHONY_SERVICE);
@@ -229,14 +240,14 @@ volatile String celltower="";
         builder.show();
 
 
-        Intent intent = getIntent();
+
         this.sensorManager = (SensorManager) getApplicationContext().getSystemService(Context.SENSOR_SERVICE);
         this.listener = new SimpleSensorListener();
         this.publishSubject = PublishSubject.create();
         initializeFSensorFusions();
 
 
-        poll = Integer.parseInt(intent.getStringExtra("poll"));
+
 
         if (checkSelfPermission(Manifest.permission.ACCESS_COARSE_LOCATION)
                 == PackageManager.PERMISSION_GRANTED && checkSelfPermission(Manifest.permission.WRITE_EXTERNAL_STORAGE)
@@ -291,7 +302,6 @@ volatile String celltower="";
         });
 
 
-
                 Toast.makeText(MainActivity.this, m_Text, Toast.LENGTH_LONG).show();
 
                 String filePath = "/storage/emulated/0/Download/" + m_Text + ".csv";
@@ -338,7 +348,7 @@ volatile String celltower="";
 
 
 
-        final int k = poll;
+
 
         handler = new Handler();
 
@@ -367,10 +377,10 @@ volatile String celltower="";
                 });
                 exportTheDB();
 
-                handler.postDelayed(this, k);
+                handler.postDelayed(this, 200);
             }
         };
-        handler.postDelayed(r, k);
+        handler.postDelayed(r, 200);
 
 
         Button start = findViewById(R.id.button3);
@@ -814,6 +824,9 @@ Toast.makeText(MainActivity.this,"workimg", (Toast.LENGTH_LONG)).show();
         getCurrentLocation.stopLocationUpdate();
         getWindow().clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
     }
+
+
+
 
 
 
