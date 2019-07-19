@@ -673,11 +673,11 @@ start.setOnClickListener(new View.OnClickListener() {
                 String cs=cellInfo.toString().substring(25,28);
                 if(cs.equalsIgnoreCase("YES"))
                 {
-                    cidcomb=cidcomb+cellInfo.toString().substring(137,142)+".";
+                    cidcomb=cidcomb+cellInfo.toString().substring(138,143)+".";
                 }
                 else if(cs.equalsIgnoreCase("NO "))
                 {
-                    cidcomb=cidcomb+cellInfo.toString().substring(132,137)+".";
+                    cidcomb=cidcomb+cellInfo.toString().substring(133,138)+".";
                 }
 
             }
