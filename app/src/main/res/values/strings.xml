@@ -3,5 +3,5 @@
     <string name="google_maps_API_key">AIzaSyBgkbXlnRIyto0me-dMP-xPOD-FEWT4p6Y</string>
     <string name="title_activity_home_screen">HomeScreen</string>
     <string name="title_activity_maps">Map</string>
-    <string name="url">http://172.16.171.177:5000</string>
+    <string name="url">http://34.93.81.156:80</string>
 </resources>

@@ -721,16 +721,41 @@ Toast.makeText(MainActivity.this,"workimg", (Toast.LENGTH_LONG)).show();
             tv.setText( main_BS.toString());
 
             for (CellInfo cellInfo : cellInfoList) {
+                Log.w("yunowork",cellInfo.toString());
                 BaseStation bs = bindData(cellInfo);
                 //Log.i(TAG, bs.toString());
                 String cs=cellInfo.toString().substring(25,28);
                 if(cs.equalsIgnoreCase("YES"))
-                {
-                    cidcomb=cidcomb+cellInfo.toString().substring(137,142)+".";
+                {   String str = cellInfo.toString();
+                    String tempCid="";
+                    for(int i=0;i<cellInfo.toString().length();i++){
+                        if (str.charAt(i)=='m' && str.charAt(i+1)=='C' && str.charAt(i+2) =='i' && str.charAt(i+3)=='d'){
+                            int j = i+5;
+                            while(str.charAt(j)!= ' '){
+                                tempCid = tempCid+str.charAt(j);
+                                j++;
+                            }
+                            break;
+                        }
+                    }
+                    //cidcomb=cidcomb+cellInfo.toString().substring(137,142)+".";
+                    cidcomb=cidcomb+tempCid+"=";
                 }
                 else if(cs.equalsIgnoreCase("NO "))
-                {
-                    cidcomb=cidcomb+cellInfo.toString().substring(132,137)+".";
+                {   String str = cellInfo.toString();
+                    String tempCid="";
+                    for(int i=0;i<cellInfo.toString().length();i++){
+                        if (str.charAt(i)=='m' && str.charAt(i+1)=='C' && str.charAt(i+2) =='i' && str.charAt(i+3)=='d'){
+                            int j = i+5;
+                            while(str.charAt(j)!= ' '){
+                                tempCid = tempCid+str.charAt(j);
+                                j++;
+                            }
+                            break;
+                        }
+                    }
+                    //cidcomb=cidcomb+cellInfo.toString().substring(132,137)+".";
+                    cidcomb=cidcomb+tempCid+"=";
                 }
 
             }
